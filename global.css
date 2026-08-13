@@ -3,3 +3,21 @@
 @import "tailwindcss/utilities.css";
 
 @import "nativewind/theme";
+
+@theme {
+  /* Warm Warm / Sunset Orange & Coral Theme Palette (Lumina Finance / PiggySavings design) */
+  --color-primary: #EE6A3B;
+  --color-primary-dark: #D45427;
+  --color-primary-light: #F48A64;
+
+  --color-bg-app: #FAF4F0;
+  --color-bg-card: #FFFFFF;
+  --color-bg-accent: #E35D31;
+
+  --color-text-main: #331C14;
+  --color-text-muted: #8C7B75;
+  --color-text-brand: #A83B1B;
+
+  --color-gold: #F5B800;
+  --color-coral-subtle: #FDF3EF;
+}
