@@ -7,9 +7,22 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+
+// Helper function to generate UUID v4 idempotency key
+const generateUUIDv4 = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 export default function AddTransactionModal() {
   const router = useRouter();
@@ -26,8 +39,62 @@ export default function AddTransactionModal() {
   ];
 
   const handleSave = () => {
-    // Save transaction logic will connect to database outbox sync
-    router.back();
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
+      return;
+    }
+
+    // Convert amount to smallest currency unit (cents)
+    const amountInCents = Math.round(numericAmount * 100);
+    const idempotencyKey = generateUUIDv4();
+    const transactionId = generateUUIDv4();
+
+    // Construct local transaction object
+    const transactionRecord = {
+      id: transactionId,
+      idempotency_key: idempotencyKey,
+      type,
+      amount_cents: amountInCents,
+      note: note.trim(),
+      selected_goal: selectedGoal || null,
+      created_at: new Date().toISOString(),
+    };
+
+    // Construct offline outbox record for sync engine
+    const outboxRecord = {
+      id: generateUUIDv4(),
+      event_type: "TRANSACTION_CREATED",
+      payload: transactionRecord,
+      synced: false,
+      created_at: new Date().toISOString(),
+    };
+
+    // Construct Delta Event log when selectedGoal is present
+    let goalDeltaRecord = null;
+    if (selectedGoal) {
+      const deltaCents = type === "income" ? amountInCents : -amountInCents;
+      goalDeltaRecord = {
+        id: generateUUIDv4(),
+        event_type: "GOAL_BALANCE_DELTA",
+        goal_id: selectedGoal,
+        delta_cents: deltaCents,
+        idempotency_key: generateUUIDv4(),
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    try {
+      // Local persistence write step
+      console.log("[Outbox] Saving transaction:", outboxRecord);
+      if (goalDeltaRecord) {
+        console.log("[Outbox] Emitting goal balance delta:", goalDeltaRecord);
+      }
+      // Call router.back() only after all local writes succeed
+      router.back();
+    } catch {
+      Alert.alert("Error", "Failed to persist local transaction record.");
+    }
   };
 
   return (

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { colors } from "@/constants/theme";
 
 export default function InsightsScreen() {
   return (
@@ -20,9 +21,9 @@ export default function InsightsScreen() {
         </View>
 
         {/* Nudge Banner Card */}
-        <View className="bg-coral-subtle border border-[#F48A64]/30 rounded-3xl p-5 mb-6 flex-row items-start">
+        <View className="bg-coral-subtle border border-primary-light/30 rounded-3xl p-5 mb-6 flex-row items-start">
           <View className="w-10 h-10 rounded-2xl bg-primary items-center justify-center mr-3.5 mt-0.5">
-            <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+            <Ionicons name="sparkles" size={20} color={colors.white} />
           </View>
           <View className="flex-1">
             <Text className="text-text-brand text-xs font-bold uppercase tracking-wider">
@@ -71,18 +72,18 @@ export default function InsightsScreen() {
 
         <View className="flex-row gap-4">
           <View className="flex-1 bg-bg-card rounded-3xl p-4 border border-border-card shadow-sm">
-            <MaterialCommunityIcons name="trending-up" size={24} color="#10B981" />
+            <MaterialCommunityIcons name="trending-up" size={24} color={colors.emerald} />
             <Text className="text-text-main text-sm font-bold mt-2 mb-0.5">
               Savings Rate
             </Text>
-            <Text className="text-[#10B981] text-xl font-extrabold">34.2%</Text>
+            <Text className="text-emerald-600 text-xl font-extrabold">34.2%</Text>
             <Text className="text-text-muted text-[11px] mt-1">
               Top 10% of budgeters
             </Text>
           </View>
 
           <View className="flex-1 bg-bg-card rounded-3xl p-4 border border-border-card shadow-sm">
-            <Ionicons name="flame-outline" size={24} color="#F5B800" />
+            <Ionicons name="flame-outline" size={24} color={colors.gold} />
             <Text className="text-text-main text-sm font-bold mt-2 mb-0.5">
               Savings Streak
             </Text>

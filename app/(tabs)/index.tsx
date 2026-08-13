@@ -2,8 +2,12 @@ import React from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { colors } from "@/constants/theme";
 
 export default function GoalsHomeScreen() {
+  const router = useRouter();
+
   return (
     <SafeAreaView className="flex-1 bg-bg-app">
       <ScrollView
@@ -20,8 +24,13 @@ export default function GoalsHomeScreen() {
               My Savings Goals 🎯
             </Text>
           </View>
-          <TouchableOpacity className="w-10 h-10 rounded-full bg-bg-card items-center justify-center border border-border-card shadow-sm">
-            <Ionicons name="notifications-outline" size={20} color="#331C14" />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+            onPress={() => router.push("/profile")}
+            className="w-10 h-10 rounded-full bg-bg-card items-center justify-center border border-border-card shadow-sm"
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.textMain} />
           </TouchableOpacity>
         </View>
 
@@ -41,7 +50,7 @@ export default function GoalsHomeScreen() {
 
           <View className="bg-white/10 rounded-2xl p-3 flex-row items-center justify-between">
             <View className="flex-row items-center">
-              <Ionicons name="trending-up" size={18} color="#FFFFFF" />
+              <Ionicons name="trending-up" size={18} color={colors.white} />
               <Text className="text-white text-xs font-medium ml-2">
                 +$450.00 this month
               </Text>
@@ -55,9 +64,9 @@ export default function GoalsHomeScreen() {
           <Text className="text-text-main text-lg font-bold">
             Featured Goal
           </Text>
-          <TouchableOpacity>
-            <Text className="text-primary text-sm font-semibold">View All</Text>
-          </TouchableOpacity>
+          <View>
+            <Text className="text-primary text-sm font-semibold">Active Overview</Text>
+          </View>
         </View>
 
         {/* Dream Setup Goal Card */}
@@ -65,7 +74,7 @@ export default function GoalsHomeScreen() {
           <View className="flex-row items-center justify-between mb-3">
             <View className="flex-row items-center">
               <View className="w-11 h-11 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
-                <MaterialCommunityIcons name="laptop" size={24} color="#EE6A3B" />
+                <MaterialCommunityIcons name="laptop" size={24} color={colors.primary} />
               </View>
               <View>
                 <Text className="text-text-main text-base font-bold">
@@ -103,7 +112,7 @@ export default function GoalsHomeScreen() {
         <View className="flex-row gap-4 mb-6">
           <View className="flex-1 bg-bg-card rounded-3xl p-4 border border-border-card shadow-sm">
             <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mb-3">
-              <Ionicons name="airplane-outline" size={20} color="#EE6A3B" />
+              <Ionicons name="airplane-outline" size={20} color={colors.primary} />
             </View>
             <Text className="text-text-main text-sm font-bold mb-1">
               Japan Trip
@@ -116,7 +125,7 @@ export default function GoalsHomeScreen() {
 
           <View className="flex-1 bg-bg-card rounded-3xl p-4 border border-border-card shadow-sm">
             <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mb-3">
-              <Ionicons name="shield-checkmark-outline" size={20} color="#EE6A3B" />
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
             </View>
             <Text className="text-text-main text-sm font-bold mb-1">
               Emergency Fund

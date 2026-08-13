@@ -9,7 +9,7 @@
 
 PiggySavings is a smart personal finance, goal-oriented savings, and budgeting mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, and modern mobile architectural practices.
 
-All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined in the core project documentation (`C:\Users\CT_DEVS\Documents\HTML_CSS_NOTES\PiggySavings\Functionalities`).
+All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined in the core project documentation (`docs/Functionalities`).
 
 ---
 
@@ -53,7 +53,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 > [!IMPORTANT]
 > **STRICT THEME ADHERENCE REQUIREMENT**:
-> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](file:///c:/Users/CT_DEVS/Documents/Projects/PiggySavings/global.css) for background, text, border, and shadow colors (e.g. `bg-bg-app`, `bg-bg-card`, `bg-primary`, `bg-coral-subtle`, `bg-gold`, `text-text-main`, `text-text-muted`, `text-text-brand`, `text-primary`, `text-gold`, `border-border-card`, `border-primary`, `shadow-primary/20`, `shadow-primary/30`, etc.). AI agents must NEVER use hardcoded background (e.g. `bg-[#FAF4F0]`, `bg-[#FFFFFF]`, `bg-[#EE6A3B]`), text (e.g. `text-[#331C14]`, `text-[#8C7B75]`, `text-[#A83B1B]`), border (e.g. `border-[#F3ECE7]`), or shadow color tokens (e.g. `shadow-[#EE6A3B]/20`) directly in JSX classNames. Always use the theme tokens defined in `global.css`.
+> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](./global.css) for background, text, border, and shadow colors (e.g. `bg-bg-app`, `bg-bg-card`, `bg-primary`, `bg-coral-subtle`, `bg-gold`, `text-text-main`, `text-text-muted`, `text-text-brand`, `text-primary`, `text-gold`, `border-border-card`, `border-primary`, `shadow-primary/20`, `shadow-primary/30`, etc.). AI agents must NEVER use hardcoded background (e.g. `bg-[#FAF4F0]`, `bg-[#FFFFFF]`, `bg-[#EE6A3B]`), text (e.g. `text-[#331C14]`, `text-[#8C7B75]`, `text-[#A83B1B]`), border (e.g. `border-[#F3ECE7]`), or shadow color tokens (e.g. `shadow-[#EE6A3B]/20`) directly in JSX classNames. Always use the theme tokens defined in `global.css`.
 
 ### Design Theme Tokens & Styling Rules
 1. **Routing**: Expo Router (`app/` directory structure with `(tabs)` layout).

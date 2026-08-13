@@ -4,6 +4,7 @@ import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { colors } from "@/constants/theme";
 
 export const CustomTabBar: React.FC<BottomTabBarProps> = ({
   state,
@@ -21,7 +22,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         <MaterialCommunityIcons
           name={focused ? "piggy-bank" : "piggy-bank-outline"}
           size={24}
-          color={focused ? "#EE6A3B" : "#8C7B75"}
+          color={focused ? colors.primary : colors.textMuted}
         />
       ),
     },
@@ -32,7 +33,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         <Ionicons
           name={focused ? "card" : "card-outline"}
           size={22}
-          color={focused ? "#EE6A3B" : "#8C7B75"}
+          color={focused ? colors.primary : colors.textMuted}
         />
       ),
     },
@@ -47,7 +48,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         <Ionicons
           name={focused ? "bar-chart" : "bar-chart-outline"}
           size={22}
-          color={focused ? "#EE6A3B" : "#8C7B75"}
+          color={focused ? colors.primary : colors.textMuted}
         />
       ),
     },
@@ -58,7 +59,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
         <Ionicons
           name={focused ? "person" : "person-outline"}
           size={22}
-          color={focused ? "#EE6A3B" : "#8C7B75"}
+          color={focused ? colors.primary : colors.textMuted}
         />
       ),
     },
@@ -76,11 +77,14 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
           return (
             <View key="center-fab" className="items-center justify-center -top-5">
               <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Add transaction"
+                accessibilityHint="Opens screen to record a new savings transaction or expense"
                 activeOpacity={0.85}
                 onPress={() => router.push("/add-transaction")}
                 className="w-14 h-14 rounded-full bg-primary items-center justify-center border-4 border-bg-app shadow-lg shadow-primary/35"
               >
-                <Ionicons name="add" size={32} color="#FFFFFF" />
+                <Ionicons name="add" size={32} color={colors.white} />
               </TouchableOpacity>
             </View>
           );

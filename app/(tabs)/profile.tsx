@@ -1,11 +1,28 @@
-import React from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch } from "react-native";
+import React, { useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { colors } from "@/constants/theme";
 
 export default function ProfileScreen() {
-  const [biometricsEnabled, setBiometricsEnabled] = React.useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  const handleEditProfile = () => {
+    Alert.alert("Edit Profile", "Profile editing feature configuration.");
+  };
+
+  const handleAutoAllocationRules = () => {
+    Alert.alert("Auto-Allocation Rules", "Goal auto-allocation rule management.");
+  };
+
+  const handleCurrencySettings = () => {
+    Alert.alert("Currency", "Selected currency: USD ($).");
+  };
+
+  const handleDataPrivacy = () => {
+    Alert.alert("Data Privacy", "Local encrypted storage and security parameters.");
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-bg-app">
@@ -38,8 +55,13 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-          <TouchableOpacity className="p-2">
-            <Ionicons name="create-outline" size={20} color="#8C7B75" />
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Edit Profile"
+            onPress={handleEditProfile}
+            className="p-2"
+          >
+            <Ionicons name="create-outline" size={20} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -53,7 +75,7 @@ export default function ProfileScreen() {
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
-                <Ionicons name="finger-print-outline" size={20} color="#EE6A3B" />
+                <Ionicons name="finger-print-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
                 Biometric Unlock
@@ -62,8 +84,8 @@ export default function ProfileScreen() {
             <Switch
               value={biometricsEnabled}
               onValueChange={setBiometricsEnabled}
-              trackColor={{ false: "#EAE0DA", true: "#EE6A3B" }}
-              thumbColor="#FFFFFF"
+              trackColor={{ false: colors.mutedTrack, true: colors.primary }}
+              thumbColor={colors.white}
             />
           </View>
 
@@ -71,7 +93,7 @@ export default function ProfileScreen() {
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
-                <Ionicons name="notifications-outline" size={20} color="#EE6A3B" />
+                <Ionicons name="notifications-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
                 Smart Nudges & Reminders
@@ -80,22 +102,27 @@ export default function ProfileScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={setNotificationsEnabled}
-              trackColor={{ false: "#EAE0DA", true: "#EE6A3B" }}
-              thumbColor="#FFFFFF"
+              trackColor={{ false: colors.mutedTrack, true: colors.primary }}
+              thumbColor={colors.white}
             />
           </View>
 
           {/* Allocation Strategy */}
-          <TouchableOpacity className="flex-row items-center justify-between py-3">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Auto-Allocation Rules"
+            onPress={handleAutoAllocationRules}
+            className="flex-row items-center justify-between py-3"
+          >
             <View className="flex-row items-center">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
-                <MaterialCommunityIcons name="cog-outline" size={20} color="#EE6A3B" />
+                <MaterialCommunityIcons name="cog-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
                 Auto-Allocation Rules
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
 
@@ -105,28 +132,38 @@ export default function ProfileScreen() {
         </Text>
 
         <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
-          <TouchableOpacity className="flex-row items-center justify-between py-3 border-b border-bg-app">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Currency Settings"
+            onPress={handleCurrencySettings}
+            className="flex-row items-center justify-between py-3 border-b border-bg-app"
+          >
             <View className="flex-row items-center">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
-                <Ionicons name="cash-outline" size={20} color="#EE6A3B" />
+                <Ionicons name="cash-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
                 Currency (USD - $)
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
-          <TouchableOpacity className="flex-row items-center justify-between py-3">
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Data Privacy & Encryption"
+            onPress={handleDataPrivacy}
+            className="flex-row items-center justify-between py-3"
+          >
             <View className="flex-row items-center">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
-                <Ionicons name="shield-checkmark-outline" size={20} color="#EE6A3B" />
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
                 Data Privacy & Encryption
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       </ScrollView>
