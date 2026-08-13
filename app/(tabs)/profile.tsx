@@ -1,0 +1,135 @@
+import React from "react";
+import { View, Text, ScrollView, TouchableOpacity, Switch } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+
+export default function ProfileScreen() {
+  const [biometricsEnabled, setBiometricsEnabled] = React.useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#FAF4F0]">
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mt-4 mb-6">
+          <Text className="text-[#8C7B75] text-xs font-semibold uppercase tracking-wider">
+            Account & Security
+          </Text>
+          <Text className="text-[#331C14] text-2xl font-bold mt-0.5">
+            Profile & Settings 👤
+          </Text>
+        </View>
+
+        {/* User Profile Card */}
+        <View className="bg-[#FFFFFF] rounded-3xl p-5 mb-6 border border-[#F3ECE7] shadow-sm flex-row items-center">
+          <View className="w-14 h-14 rounded-full bg-[#EE6A3B] items-center justify-center mr-4">
+            <Text className="text-white text-xl font-bold">JD</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-[#331C14] text-lg font-bold">Jane Doe</Text>
+            <Text className="text-[#8C7B75] text-xs font-medium mt-0.5">
+              jane.doe@example.com
+            </Text>
+            <View className="bg-[#FDF3EF] self-start px-2.5 py-0.5 rounded-full mt-2">
+              <Text className="text-[#EE6A3B] text-[10px] font-bold">
+                PRO SAVER MEMBER
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity className="p-2">
+            <Ionicons name="create-outline" size={20} color="#8C7B75" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Settings Group - Preferences */}
+        <Text className="text-[#331C14] text-lg font-bold mb-3">
+          App Preferences
+        </Text>
+
+        <View className="bg-[#FFFFFF] rounded-3xl p-4 mb-6 border border-[#F3ECE7] shadow-sm">
+          {/* Security & Biometrics */}
+          <View className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+            <View className="flex-row items-center">
+              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+                <Ionicons name="finger-print-outline" size={20} color="#EE6A3B" />
+              </View>
+              <Text className="text-[#331C14] text-sm font-semibold">
+                Biometric Unlock
+              </Text>
+            </View>
+            <Switch
+              value={biometricsEnabled}
+              onValueChange={setBiometricsEnabled}
+              trackColor={{ false: "#EAE0DA", true: "#EE6A3B" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {/* Smart Nudges & Notifications */}
+          <View className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+            <View className="flex-row items-center">
+              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+                <Ionicons name="notifications-outline" size={20} color="#EE6A3B" />
+              </View>
+              <Text className="text-[#331C14] text-sm font-semibold">
+                Smart Nudges & Reminders
+              </Text>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={setNotificationsEnabled}
+              trackColor={{ false: "#EAE0DA", true: "#EE6A3B" }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {/* Allocation Strategy */}
+          <TouchableOpacity className="flex-row items-center justify-between py-3">
+            <View className="flex-row items-center">
+              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+                <MaterialCommunityIcons name="cog-outline" size={20} color="#EE6A3B" />
+              </View>
+              <Text className="text-[#331C14] text-sm font-semibold">
+                Auto-Allocation Rules
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Currency & Privacy */}
+        <Text className="text-[#331C14] text-lg font-bold mb-3">
+          Security & Privacy
+        </Text>
+
+        <View className="bg-[#FFFFFF] rounded-3xl p-4 mb-6 border border-[#F3ECE7] shadow-sm">
+          <TouchableOpacity className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+            <View className="flex-row items-center">
+              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+                <Ionicons name="cash-outline" size={20} color="#EE6A3B" />
+              </View>
+              <Text className="text-[#331C14] text-sm font-semibold">
+                Currency (USD - $)
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+          </TouchableOpacity>
+
+          <TouchableOpacity className="flex-row items-center justify-between py-3">
+            <View className="flex-row items-center">
+              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+                <Ionicons name="shield-checkmark-outline" size={20} color="#EE6A3B" />
+              </View>
+              <Text className="text-[#331C14] text-sm font-semibold">
+                Data Privacy & Encryption
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#8C7B75" />
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
