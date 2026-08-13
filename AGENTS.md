@@ -53,7 +53,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 > [!IMPORTANT]
 > **STRICT THEME ADHERENCE REQUIREMENT**:
-> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](file:///c:/Users/CT_DEVS/Documents/Projects/PiggySavings/global.css). Do NOT hardcode arbitrary colors when building core app screens.
+> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](file:///c:/Users/CT_DEVS/Documents/Projects/PiggySavings/global.css) for background, text, border, and shadow colors (e.g. `bg-bg-app`, `bg-bg-card`, `bg-primary`, `bg-coral-subtle`, `bg-gold`, `text-text-main`, `text-text-muted`, `text-text-brand`, `text-primary`, `text-gold`, `border-border-card`, `border-primary`, `shadow-primary/20`, `shadow-primary/30`, etc.). AI agents must NEVER use hardcoded background (e.g. `bg-[#FAF4F0]`, `bg-[#FFFFFF]`, `bg-[#EE6A3B]`), text (e.g. `text-[#331C14]`, `text-[#8C7B75]`, `text-[#A83B1B]`), border (e.g. `border-[#F3ECE7]`), or shadow color tokens (e.g. `shadow-[#EE6A3B]/20`) directly in JSX classNames. Always use the theme tokens defined in `global.css`.
 
 ### Design Theme Tokens & Styling Rules
 1. **Routing**: Expo Router (`app/` directory structure with `(tabs)` layout).
@@ -62,6 +62,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
    - **App Background (`bg-bg-app` / `#FAF4F0`)**: Soft warm off-white / light cream tone.
    - **Primary Action Accent (`bg-primary` / `#EE6A3B`, `bg-primary-dark` / `#D45427`)**: Vibrant sunset orange/coral hero cards & primary buttons.
    - **Card Backgrounds (`bg-bg-card` / `#FFFFFF`, `bg-bg-accent` / `#E35D31`)**: Crisp white rounded containers or coral highlight cards.
+   - **Borders & Dividers (`border-border-card` / `#F3ECE7`)**: Soft warm card borders.
    - **Text Colors**:
      - Dark Cocoa / Primary text: `text-text-main` (`#331C14`)
      - Muted Subtitles: `text-text-muted` (`#8C7B75`)

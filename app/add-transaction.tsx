@@ -33,17 +33,17 @@ export default function AddTransactionModal() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-[#FAF4F0]"
+      className="flex-1 bg-bg-app"
     >
       <View className="flex-1 pt-6 px-6">
         {/* Header */}
         <View className="flex-row items-center justify-between mb-6">
-          <Text className="text-[#331C14] text-xl font-extrabold">
+          <Text className="text-text-main text-xl font-extrabold">
             Quick Add Transaction ⚡
           </Text>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="w-9 h-9 rounded-full bg-[#FFFFFF] items-center justify-center border border-[#F3ECE7]"
+            className="w-9 h-9 rounded-full bg-bg-card items-center justify-center border border-border-card"
           >
             <Ionicons name="close" size={20} color="#331C14" />
           </TouchableOpacity>
@@ -51,16 +51,16 @@ export default function AddTransactionModal() {
 
         <ScrollView showsVerticalScrollIndicator={false}>
           {/* Income vs Expense Toggle */}
-          <View className="flex-row bg-[#FFFFFF] p-1.5 rounded-2xl border border-[#F3ECE7] mb-6">
+          <View className="flex-row bg-bg-card p-1.5 rounded-2xl border border-border-card mb-6">
             <TouchableOpacity
               onPress={() => setType("income")}
               className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                type === "income" ? "bg-[#EE6A3B]" : "bg-transparent"
+                type === "income" ? "bg-primary" : "bg-transparent"
               }`}
             >
               <Text
                 className={`text-xs font-bold ${
-                  type === "income" ? "text-white" : "text-[#8C7B75]"
+                  type === "income" ? "text-white" : "text-text-muted"
                 }`}
               >
                 + Income / Funding
@@ -70,12 +70,12 @@ export default function AddTransactionModal() {
             <TouchableOpacity
               onPress={() => setType("expense")}
               className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                type === "expense" ? "bg-[#331C14]" : "bg-transparent"
+                type === "expense" ? "bg-text-main" : "bg-transparent"
               }`}
             >
               <Text
                 className={`text-xs font-bold ${
-                  type === "expense" ? "text-white" : "text-[#8C7B75]"
+                  type === "expense" ? "text-white" : "text-text-muted"
                 }`}
               >
                 - Expense / Withdrawal
@@ -84,12 +84,12 @@ export default function AddTransactionModal() {
           </View>
 
           {/* Amount Input */}
-          <View className="bg-[#FFFFFF] rounded-3xl p-5 mb-6 border border-[#F3ECE7] items-center">
-            <Text className="text-[#8C7B75] text-xs font-semibold uppercase tracking-wider mb-2">
+          <View className="bg-bg-card rounded-3xl p-5 mb-6 border border-border-card items-center">
+            <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">
               Transaction Amount
             </Text>
             <View className="flex-row items-center">
-              <Text className="text-[#331C14] text-3xl font-extrabold mr-1">
+              <Text className="text-text-main text-3xl font-extrabold mr-1">
                 $
               </Text>
               <TextInput
@@ -99,13 +99,13 @@ export default function AddTransactionModal() {
                 placeholderTextColor="#CCCCCC"
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className="text-[#331C14] text-4xl font-extrabold flex-1"
+                className="text-text-main text-4xl font-extrabold flex-1"
               />
             </View>
           </View>
 
           {/* Goal Allocation Selector */}
-          <Text className="text-[#331C14] text-sm font-bold mb-3">
+          <Text className="text-text-main text-sm font-bold mb-3">
             Target Goal Auto-Allocation
           </Text>
           <View className="flex-row flex-wrap gap-2 mb-6">
@@ -117,13 +117,13 @@ export default function AddTransactionModal() {
                   onPress={() => setSelectedGoal(g)}
                   className={`px-4 py-2.5 rounded-2xl border ${
                     isSelected
-                      ? "bg-[#FDF3EF] border-[#EE6A3B]"
-                      : "bg-[#FFFFFF] border-[#F3ECE7]"
+                      ? "bg-coral-subtle border-primary"
+                      : "bg-bg-card border-border-card"
                   }`}
                 >
                   <Text
                     className={`text-xs font-bold ${
-                      isSelected ? "text-[#EE6A3B]" : "text-[#331C14]"
+                      isSelected ? "text-primary" : "text-text-main"
                     }`}
                   >
                     🎯 {g}
@@ -134,16 +134,16 @@ export default function AddTransactionModal() {
           </View>
 
           {/* Note Input */}
-          <Text className="text-[#331C14] text-sm font-bold mb-2">
+          <Text className="text-text-main text-sm font-bold mb-2">
             Description / Note
           </Text>
-          <View className="bg-[#FFFFFF] rounded-2xl p-4 border border-[#F3ECE7] mb-8">
+          <View className="bg-bg-card rounded-2xl p-4 border border-border-card mb-8">
             <TextInput
               value={note}
               onChangeText={setNote}
               placeholder="e.g., Freelance Project Payout, Client deposit..."
               placeholderTextColor="#8C7B75"
-              className="text-sm text-[#331C14]"
+              className="text-sm text-text-main"
             />
           </View>
 
@@ -151,7 +151,7 @@ export default function AddTransactionModal() {
           <TouchableOpacity
             onPress={handleSave}
             activeOpacity={0.85}
-            className="bg-[#EE6A3B] rounded-2xl py-4 items-center justify-center shadow-lg shadow-[#EE6A3B]/30 mb-8"
+            className="bg-primary rounded-2xl py-4 items-center justify-center shadow-lg shadow-primary/30 mb-8"
           >
             <Text className="text-white text-base font-bold">
               Save Transaction & Allocate 🎯

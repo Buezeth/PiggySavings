@@ -8,32 +8,32 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#FAF4F0]">
+    <SafeAreaView className="flex-1 bg-bg-app">
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4 mb-6">
-          <Text className="text-[#8C7B75] text-xs font-semibold uppercase tracking-wider">
+          <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider">
             Account & Security
           </Text>
-          <Text className="text-[#331C14] text-2xl font-bold mt-0.5">
+          <Text className="text-text-main text-2xl font-bold mt-0.5">
             Profile & Settings 👤
           </Text>
         </View>
 
         {/* User Profile Card */}
-        <View className="bg-[#FFFFFF] rounded-3xl p-5 mb-6 border border-[#F3ECE7] shadow-sm flex-row items-center">
-          <View className="w-14 h-14 rounded-full bg-[#EE6A3B] items-center justify-center mr-4">
+        <View className="bg-bg-card rounded-3xl p-5 mb-6 border border-border-card shadow-sm flex-row items-center">
+          <View className="w-14 h-14 rounded-full bg-primary items-center justify-center mr-4">
             <Text className="text-white text-xl font-bold">JD</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-[#331C14] text-lg font-bold">Jane Doe</Text>
-            <Text className="text-[#8C7B75] text-xs font-medium mt-0.5">
+            <Text className="text-text-main text-lg font-bold">Jane Doe</Text>
+            <Text className="text-text-muted text-xs font-medium mt-0.5">
               jane.doe@example.com
             </Text>
-            <View className="bg-[#FDF3EF] self-start px-2.5 py-0.5 rounded-full mt-2">
-              <Text className="text-[#EE6A3B] text-[10px] font-bold">
+            <View className="bg-coral-subtle self-start px-2.5 py-0.5 rounded-full mt-2">
+              <Text className="text-primary text-[10px] font-bold">
                 PRO SAVER MEMBER
               </Text>
             </View>
@@ -44,18 +44,18 @@ export default function ProfileScreen() {
         </View>
 
         {/* Settings Group - Preferences */}
-        <Text className="text-[#331C14] text-lg font-bold mb-3">
+        <Text className="text-text-main text-lg font-bold mb-3">
           App Preferences
         </Text>
 
-        <View className="bg-[#FFFFFF] rounded-3xl p-4 mb-6 border border-[#F3ECE7] shadow-sm">
+        <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
           {/* Security & Biometrics */}
-          <View className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+          <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="finger-print-outline" size={20} color="#EE6A3B" />
               </View>
-              <Text className="text-[#331C14] text-sm font-semibold">
+              <Text className="text-text-main text-sm font-semibold">
                 Biometric Unlock
               </Text>
             </View>
@@ -68,12 +68,12 @@ export default function ProfileScreen() {
           </View>
 
           {/* Smart Nudges & Notifications */}
-          <View className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+          <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="notifications-outline" size={20} color="#EE6A3B" />
               </View>
-              <Text className="text-[#331C14] text-sm font-semibold">
+              <Text className="text-text-main text-sm font-semibold">
                 Smart Nudges & Reminders
               </Text>
             </View>
@@ -88,10 +88,10 @@ export default function ProfileScreen() {
           {/* Allocation Strategy */}
           <TouchableOpacity className="flex-row items-center justify-between py-3">
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <MaterialCommunityIcons name="cog-outline" size={20} color="#EE6A3B" />
               </View>
-              <Text className="text-[#331C14] text-sm font-semibold">
+              <Text className="text-text-main text-sm font-semibold">
                 Auto-Allocation Rules
               </Text>
             </View>
@@ -100,17 +100,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* Currency & Privacy */}
-        <Text className="text-[#331C14] text-lg font-bold mb-3">
+        <Text className="text-text-main text-lg font-bold mb-3">
           Security & Privacy
         </Text>
 
-        <View className="bg-[#FFFFFF] rounded-3xl p-4 mb-6 border border-[#F3ECE7] shadow-sm">
-          <TouchableOpacity className="flex-row items-center justify-between py-3 border-b border-[#FAF4F0]">
+        <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
+          <TouchableOpacity className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="cash-outline" size={20} color="#EE6A3B" />
               </View>
-              <Text className="text-[#331C14] text-sm font-semibold">
+              <Text className="text-text-main text-sm font-semibold">
                 Currency (USD - $)
               </Text>
             </View>
@@ -119,10 +119,10 @@ export default function ProfileScreen() {
 
           <TouchableOpacity className="flex-row items-center justify-between py-3">
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-[#FDF3EF] items-center justify-center mr-3">
+              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="shield-checkmark-outline" size={20} color="#EE6A3B" />
               </View>
-              <Text className="text-[#331C14] text-sm font-semibold">
+              <Text className="text-text-main text-sm font-semibold">
                 Data Privacy & Encryption
               </Text>
             </View>
