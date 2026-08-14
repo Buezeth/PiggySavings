@@ -98,14 +98,20 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 ## 📐 Layout & Ergonomics Guidelines
 
 1. **Routing Structure**: Expo Router (`app/` directory structure with `(tabs)` layout and modal stacks).
-2. **Safe Area Insets**:
-   - ALL screens, modals, custom headers, and tab bars **MUST** consume `useSafeAreaInsets()` from `react-native-safe-area-context`.
-   - Apply dynamic safe-padding (`paddingTop: Math.max(insets.top, 16)`, `paddingBottom: Math.max(insets.bottom, 16)`).
+2. **Safe Area Insets & Layout Wrappers**:
+   - **MUST USE**: ALL screens, modals, custom headers, and tab bars **MUST** consume `useSafeAreaInsets()` from `react-native-safe-area-context`.
+   - **DYNAMIC PADDING**: Always apply dynamic safe-padding using `Math.max()` to handle both low-end devices and devices with notches/dynamic islands:
+     - Top padding: `paddingTop: Math.max(insets.top, 16)`
+     - Bottom scroll content padding: `contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}`
+   - **FORBIDDEN**: AI agents must **NEVER** use `<SafeAreaView>` wrapper components (from `react-native` or `react-native-safe-area-context`) or hardcoded fixed paddings (e.g. `paddingBottom: 40`, `pt-4`) for root screen layouts.
    - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Instead, set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view to ensure seamless status bar and notch integration across iOS dynamic islands and Android edge-to-edge displays.
 3. **Speedometer & Arc Gauges**:
    - Build lightweight, high-performance semi-circular gauges using geometric styling (radius, center-point calculations, glowing knob indicator, and radial tick marks) referencing overlay tokens (`colors.whiteOverlay20`, `colors.white`, etc.) without introducing heavy external binaries.
-4. **Visual Hierarchy & Polish**:
+4. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
+   - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
+   - This informs `react-native-css-interop` to pre-allocate variable slots on initial render, preventing unexpected component state resets, re-mount warnings (`ReactNativeCss`), and UI flickers.
+5. **Visual Hierarchy & Polish**:
    - Soft rounded corners (`rounded-3xl` / `rounded-2xl` / `rounded-b-[36px]`).
    - Clean 3-column docked metric cards with dividers.
    - High-contrast financial typography, trend indicators with directional arrows (`↑` / `↓`), and pill filters.
-5. **Performance**: 0ms latency UI updates using optimistic local mutations before background synchronization.
+6. **Performance**: 0ms latency UI updates using optimistic local mutations before background synchronization.

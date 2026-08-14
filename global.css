@@ -24,8 +24,10 @@
 
     /* State & Trend Accents */
     --color-emerald: #10B981;
+    --color-emerald-subtle: #ECFDF5;
     --color-trend-up: #10B981;
     --color-trend-up-bg: #ECFDF5;
+    --color-muted-track: #EAE0DA;
 
     /* Translucent & Gauge Overlay Tokens */
     --color-white-overlay-10: rgba(255, 255, 255, 0.1);

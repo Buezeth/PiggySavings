@@ -132,7 +132,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({
               {tab.renderIcon && tab.renderIcon(isFocused)}
             </View>
             <Text
-              className={`text-[11px] ${
+              className={`will-change-variable text-[11px] ${
                 isFocused
                   ? "text-text-main font-bold"
                   : "text-text-muted font-medium"

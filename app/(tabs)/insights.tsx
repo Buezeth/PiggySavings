@@ -1,14 +1,19 @@
 import React from "react";
 import { View, Text, ScrollView } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "@/constants/theme";
 
 export default function InsightsScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView className="flex-1 bg-bg-app">
+    <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4 mb-6">
@@ -94,6 +99,6 @@ export default function InsightsScreen() {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

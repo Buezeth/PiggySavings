@@ -20,6 +20,7 @@ export const colors = {
 
   // Visual state & trend accents
   emerald: "#10B981",
+  emeraldSubtle: "#ECFDF5",
   trendUp: "#10B981",
   trendUpBg: "#ECFDF5",
   mutedTrack: "#EAE0DA",

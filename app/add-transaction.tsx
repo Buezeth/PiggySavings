@@ -41,14 +41,21 @@ export default function AddTransactionModal() {
   ];
 
   const handleSave = () => {
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
+    const trimmedAmount = amount.trim();
+    // Validate format: positive number with at most 2 decimal places and no non-numeric characters
+    if (!/^\d+(\.\d{1,2})?$/.test(trimmedAmount)) {
       Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
       return;
     }
 
+    const numericAmount = parseFloat(trimmedAmount);
     // Convert amount to smallest currency unit (cents)
     const amountInCents = Math.round(numericAmount * 100);
+
+    if (isNaN(numericAmount) || numericAmount <= 0 || amountInCents <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
+      return;
+    }
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
 
@@ -88,9 +95,21 @@ export default function AddTransactionModal() {
 
     try {
       // Local persistence write step
-      console.log("[Outbox] Saving transaction:", outboxRecord);
-      if (goalDeltaRecord) {
-        console.log("[Outbox] Emitting goal balance delta:", goalDeltaRecord);
+      if (__DEV__) {
+        console.log("[Outbox] Saving transaction record:", {
+          id: outboxRecord.id,
+          event_type: outboxRecord.event_type,
+          synced: outboxRecord.synced,
+          created_at: outboxRecord.created_at,
+        });
+        if (goalDeltaRecord) {
+          console.log("[Outbox] Emitting goal balance delta record:", {
+            id: goalDeltaRecord.id,
+            event_type: goalDeltaRecord.event_type,
+            goal_id: goalDeltaRecord.goal_id,
+            created_at: goalDeltaRecord.created_at,
+          });
+        }
       }
       // Call router.back() only after all local writes succeed
       router.back();
@@ -129,12 +148,12 @@ export default function AddTransactionModal() {
           <View className="flex-row bg-bg-card p-1.5 rounded-2xl border border-border-card mb-6">
             <TouchableOpacity
               onPress={() => setType("income")}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+              className={`will-change-variable flex-1 py-3 rounded-xl items-center justify-center ${
                 type === "income" ? "bg-primary" : "bg-transparent"
               }`}
             >
               <Text
-                className={`text-xs font-bold ${
+                className={`will-change-variable text-xs font-bold ${
                   type === "income" ? "text-white" : "text-text-muted"
                 }`}
               >
@@ -144,12 +163,12 @@ export default function AddTransactionModal() {
 
             <TouchableOpacity
               onPress={() => setType("expense")}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
+              className={`will-change-variable flex-1 py-3 rounded-xl items-center justify-center ${
                 type === "expense" ? "bg-text-main" : "bg-transparent"
               }`}
             >
               <Text
-                className={`text-xs font-bold ${
+                className={`will-change-variable text-xs font-bold ${
                   type === "expense" ? "text-white" : "text-text-muted"
                 }`}
               >

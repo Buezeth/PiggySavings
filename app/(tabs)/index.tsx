@@ -29,12 +29,12 @@ export default function GoalsHomeScreen() {
     <View className="flex-1 bg-bg-app">
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}
       >
         {/* ─── FULL-BLEED HERO SECTION (Flat bottom with straddling stats card) ─── */}
         <View
-          style={{ paddingTop: Math.max(insets.top, 14) }}
-          className="w-full bg-primary pb-0 mb-8 px-5"
+          style={{ paddingTop: Math.max(insets.top, 16) }}
+          className="will-change-variable w-full bg-primary pb-0 mb-8 px-5"
         >
           {/* Top Hero App Bar */}
           <View className="flex-row items-center justify-between mb-3">
@@ -71,11 +71,11 @@ export default function GoalsHomeScreen() {
                     key={period}
                     onPress={() => setSelectedPeriod(period)}
                     activeOpacity={0.85}
-                    className={`px-5 py-1.5 rounded-full ${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"
+                    className={`will-change-variable px-5 py-1.5 rounded-full ${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"
                       }`}
                   >
                     <Text
-                      className={`text-xs font-black ${isActive ? "text-primary" : "text-white"
+                      className={`will-change-variable text-xs font-black ${isActive ? "text-primary" : "text-white"
                         }`}
                     >
                       {period}
@@ -135,7 +135,8 @@ export default function GoalsHomeScreen() {
                   borderColor: colors.white,
                   borderBottomColor: "transparent",
                   borderLeftColor: "transparent",
-                  transform: [{ rotate: "-45deg" }],
+                  // transform: [{ rotate: "-45deg" }],
+                  transform: [{ rotate: `${-45 + (1 - gaugePercent) * -180}deg` }],
                   position: "absolute",
                   top: 15,
                 }}

@@ -1,12 +1,39 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { colors } from "@/constants/theme";
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+  // Biometric & Notification modules/flows are not installed/configured in the current project runtime.
+  // We mark both as unavailable, keep state false and disabled.
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const isBiometricsAvailable = false;
+  const isNotificationsAvailable = false;
+
+  const handleBiometricsToggle = (value: boolean) => {
+    if (!isBiometricsAvailable) {
+      Alert.alert(
+        "Biometrics Unavailable",
+        "Biometric authentication is not supported or configured on this device."
+      );
+      return;
+    }
+    setBiometricsEnabled(value);
+  };
+
+  const handleNotificationsToggle = (value: boolean) => {
+    if (!isNotificationsAvailable) {
+      Alert.alert(
+        "Notifications Unavailable",
+        "Push notification permissions and services are currently unavailable."
+      );
+      return;
+    }
+    setNotificationsEnabled(value);
+  };
 
   const handleEditProfile = () => {
     Alert.alert("Edit Profile", "Profile editing feature configuration.");
@@ -21,13 +48,19 @@ export default function ProfileScreen() {
   };
 
   const handleDataPrivacy = () => {
-    Alert.alert("Data Privacy", "Local encrypted storage and security parameters.");
+    Alert.alert(
+      "Data Privacy",
+      "Local data storage and security parameters."
+    );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-app">
+    <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4 mb-6">
@@ -73,17 +106,25 @@ export default function ProfileScreen() {
         <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
           {/* Security & Biometrics */}
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
-            <View className="flex-row items-center">
+            <View className="flex-row items-center flex-1 mr-3">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="finger-print-outline" size={20} color={colors.primary} />
               </View>
-              <Text className="text-text-main text-sm font-semibold">
-                Biometric Unlock
-              </Text>
+              <View>
+                <Text className="text-text-main text-sm font-semibold">
+                  Biometric Unlock
+                </Text>
+                {!isBiometricsAvailable && (
+                  <Text className="text-text-muted text-xs font-normal mt-0.5">
+                    Unavailable on this device
+                  </Text>
+                )}
+              </View>
             </View>
             <Switch
+              disabled={!isBiometricsAvailable}
               value={biometricsEnabled}
-              onValueChange={setBiometricsEnabled}
+              onValueChange={handleBiometricsToggle}
               trackColor={{ false: colors.mutedTrack, true: colors.primary }}
               thumbColor={colors.white}
             />
@@ -91,17 +132,25 @@ export default function ProfileScreen() {
 
           {/* Smart Nudges & Notifications */}
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
-            <View className="flex-row items-center">
+            <View className="flex-row items-center flex-1 mr-3">
               <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="notifications-outline" size={20} color={colors.primary} />
               </View>
-              <Text className="text-text-main text-sm font-semibold">
-                Smart Nudges & Reminders
-              </Text>
+              <View>
+                <Text className="text-text-main text-sm font-semibold">
+                  Smart Nudges & Reminders
+                </Text>
+                {!isNotificationsAvailable && (
+                  <Text className="text-text-muted text-xs font-normal mt-0.5">
+                    Unavailable on this device
+                  </Text>
+                )}
+              </View>
             </View>
             <Switch
+              disabled={!isNotificationsAvailable}
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={handleNotificationsToggle}
               trackColor={{ false: colors.mutedTrack, true: colors.primary }}
               thumbColor={colors.white}
             />
@@ -151,7 +200,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity
             accessibilityRole="button"
-            accessibilityLabel="Data Privacy & Encryption"
+            accessibilityLabel="Data Privacy & Settings"
             onPress={handleDataPrivacy}
             className="flex-row items-center justify-between py-3"
           >
@@ -160,13 +209,13 @@ export default function ProfileScreen() {
                 <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
               </View>
               <Text className="text-text-main text-sm font-semibold">
-                Data Privacy & Encryption
+                Data Privacy
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }

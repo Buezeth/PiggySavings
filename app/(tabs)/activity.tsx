@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, TextInput, TouchableOpacity } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "@/constants/theme";
 
 export default function ActivityScreen() {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
 
@@ -64,7 +65,7 @@ export default function ActivityScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-bg-app">
+    <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
       <View className="px-5 pt-4 pb-2">
         <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider">
           Transaction Ledger
@@ -88,7 +89,7 @@ export default function ActivityScreen() {
             accessibilityLabel="Filter transactions"
             accessibilityHint={`Current filter: ${filterType}`}
             onPress={toggleFilter}
-            className={`p-1.5 rounded-lg ${
+            className={`will-change-variable p-1.5 rounded-lg ${
               filterType !== "all" ? "bg-primary" : "bg-coral-subtle"
             }`}
           >
@@ -112,7 +113,10 @@ export default function ActivityScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
         showsVerticalScrollIndicator={false}
       >
         <Text className="text-text-muted text-xs font-bold uppercase mb-3 tracking-wider">
@@ -171,6 +175,6 @@ export default function ActivityScreen() {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
