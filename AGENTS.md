@@ -49,27 +49,63 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 ---
 
-## 🎨 UI/UX & Design Guidelines
+## 🎨 UI/UX & Strict Theme Token Guidelines
 
 > [!IMPORTANT]
 > **STRICT THEME ADHERENCE REQUIREMENT**:
-> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](./global.css) for background, text, border, and shadow colors (e.g. `bg-bg-app`, `bg-bg-card`, `bg-primary`, `bg-coral-subtle`, `bg-gold`, `text-text-main`, `text-text-muted`, `text-text-brand`, `text-primary`, `text-gold`, `border-border-card`, `border-primary`, `shadow-primary/20`, `shadow-primary/30`, etc.). AI agents must NEVER use hardcoded background (e.g. `bg-[#FAF4F0]`, `bg-[#FFFFFF]`, `bg-[#EE6A3B]`), text (e.g. `text-[#331C14]`, `text-[#8C7B75]`, `text-[#A83B1B]`), border (e.g. `border-[#F3ECE7]`), or shadow color tokens (e.g. `shadow-[#EE6A3B]/20`) directly in JSX classNames. Always use the theme tokens defined in `global.css`.
+> Whenever building or modifying UI screens, components, or styles, AI agents **MUST ALWAYS reference and use the central design theme tokens** defined in [`global.css`](./global.css) and [`constants/theme.ts`](./constants/theme.ts).
+> 
+> **FORBIDDEN**: AI agents must **NEVER** use hardcoded hex or arbitrary color tokens (e.g. `bg-[#FAF4F0]`, `bg-[#FFFFFF]`, `bg-[#EE6A3B]`, `text-[#331C14]`, `text-[#8C7B75]`, `text-[#A83B1B]`, `border-[#F3ECE7]`, `shadow-[#EE6A3B]/20`) directly in JSX classNames or inline styles.
+> 
+> **EXTENDING THE DESIGN SYSTEM**: If a new color token, overlay, or state value is needed, you **MUST first declare it in `@theme` in `global.css`** and export the corresponding constant in `constants/theme.ts` before using it in components. Keep both files in complete parity at all times.
 
-### Design Theme Tokens & Styling Rules
-1. **Routing**: Expo Router (`app/` directory structure with `(tabs)` layout).
-2. **Styling Engine**: NativeWind v4 with TailwindCSS utility classes. Global stylesheet imported via `@/global.css` or `../global.css`.
-3. **Color Palette Theme (Warm Sunset Coral & Cream UI)**:
-   - **App Background (`bg-bg-app` / `#FAF4F0`)**: Soft warm off-white / light cream tone.
-   - **Primary Action Accent (`bg-primary` / `#EE6A3B`, `bg-primary-dark` / `#D45427`)**: Vibrant sunset orange/coral hero cards & primary buttons.
-   - **Card Backgrounds (`bg-bg-card` / `#FFFFFF`, `bg-bg-accent` / `#E35D31`)**: Crisp white rounded containers or coral highlight cards.
-   - **Borders & Dividers (`border-border-card` / `#F3ECE7`)**: Soft warm card borders.
-   - **Text Colors**:
-     - Dark Cocoa / Primary text: `text-text-main` (`#331C14`)
-     - Muted Subtitles: `text-text-muted` (`#8C7B75`)
-     - Brand Header text: `text-text-brand` (`#A83B1B`)
-   - **Accents**:
-     - Savings indicator gold: `bg-gold` / `text-gold` (`#F5B800`)
-     - Subtle coral pill backgrounds: `bg-coral-subtle` (`#FDF3EF`)
-4. **Visual Polish & Aesthetics**:
-   - Soft rounded cards (`rounded-3xl` / `rounded-2xl`), smooth progress semi-circles/gauges, clean typography hierarchy, subtle pill badges, and high-contrast readable financial figures.
-5. **Performance**: 0ms latency UI updates using optimistic local mutations before syncing in background.
+### Design Theme Tokens Registry
+
+#### 1. Background Tokens
+- App canvas: `bg-bg-app` (`#FAF4F0`)
+- Standard card & sheet: `bg-bg-card` (`#FFFFFF`)
+- Primary brand accent / Hero background: `bg-primary` (`#EE6A3B`), `bg-primary-dark` (`#D45427`), `bg-primary-light` (`#F48A64`)
+- Accent container / Highlight card: `bg-bg-accent` (`#E35D31`)
+- Pill & subtle highlight: `bg-coral-subtle` (`#FDF3EF`)
+- Gauge & Translucent Overlays:
+  - `bg-white-overlay-10` (`rgba(255, 255, 255, 0.1)`)
+  - `bg-white-overlay-20` (`rgba(255, 255, 255, 0.2)`)
+  - `bg-white-overlay-30` (`rgba(255, 255, 255, 0.3)`)
+  - `bg-white-overlay-40` (`rgba(255, 255, 255, 0.4)`)
+  - `bg-white-overlay-80` (`rgba(255, 255, 255, 0.8)`)
+- State & Success Badges: `bg-trend-up-bg` / `bg-emerald-subtle` (`#ECFDF5`), `bg-gold` (`#F5B800`)
+
+#### 2. Text Tokens
+- Primary cocoa body / numbers: `text-text-main` (`#331C14`)
+- Subtitles & muted labels: `text-text-muted` (`#8C7B75`)
+- Brand header accents: `text-text-brand` (`#A83B1B`)
+- Primary brand text: `text-primary` (`#EE6A3B`)
+- Savings indicators & milestones: `text-gold` (`#F5B800`)
+- Trends & Success metrics: `text-trend-up` / `text-emerald` (`#10B981`)
+- Light text on brand surfaces: `text-white` (`#FFFFFF`), `text-white-overlay-80` (`rgba(255, 255, 255, 0.8)`)
+
+#### 3. Border & Divider Tokens
+- Standard card borders: `border-border-card` (`#F3ECE7`)
+- Primary brand borders: `border-primary` (`#EE6A3B`)
+- Translucent hero borders: `border-white-overlay-10`, `border-white-overlay-20`
+
+#### 4. Shadow Tokens
+- Primary glow: `shadow-primary/20`, `shadow-primary/25`, `shadow-primary/35`
+- Elevation: `shadow-sm`, `shadow-md`, `shadow-lg`
+
+---
+
+## 📐 Layout & Ergonomics Guidelines
+
+1. **Routing Structure**: Expo Router (`app/` directory structure with `(tabs)` layout and modal stacks).
+2. **Safe Area Insets**:
+   - ALL screens, modals, custom headers, and tab bars **MUST** consume `useSafeAreaInsets()` from `react-native-safe-area-context`.
+   - Apply dynamic safe-padding (`paddingTop: Math.max(insets.top, 16)`, `paddingBottom: Math.max(insets.bottom, 16)`).
+   - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Instead, set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view to ensure seamless status bar and notch integration across iOS dynamic islands and Android edge-to-edge displays.
+3. **Speedometer & Arc Gauges**:
+   - Build lightweight, high-performance semi-circular gauges using geometric styling (radius, center-point calculations, glowing knob indicator, and radial tick marks) referencing overlay tokens (`colors.whiteOverlay20`, `colors.white`, etc.) without introducing heavy external binaries.
+4. **Visual Hierarchy & Polish**:
+   - Soft rounded corners (`rounded-3xl` / `rounded-2xl` / `rounded-b-[36px]`).
+   - Clean 3-column docked metric cards with dividers.
+   - High-contrast financial typography, trend indicators with directional arrows (`↑` / `↓`), and pill filters.
+5. **Performance**: 0ms latency UI updates using optimistic local mutations before background synchronization.

@@ -5,21 +5,32 @@
 @import "nativewind/theme";
 
 @theme {
-  /* Warm Warm / Sunset Orange & Coral Theme Palette (Lumina Finance / PiggySavings design) */
-  --color-primary: #EE6A3B;
-  --color-primary-dark: #D45427;
-  --color-primary-light: #F48A64;
+    /* Warm Sunset Coral & Cream Theme Palette */
+    --color-primary: #EE6A3B;
+    --color-primary-dark: #D45427;
+    --color-primary-light: #F48A64;
 
-  --color-bg-app: #FAF4F0;
-  --color-bg-card: #FFFFFF;
-  --color-bg-accent: #E35D31;
+    --color-bg-app: #FAF4F0;
+    --color-bg-card: #FFFFFF;
+    --color-bg-accent: #E35D31;
 
-  --color-text-main: #331C14;
-  --color-text-muted: #8C7B75;
-  --color-text-brand: #A83B1B;
+    --color-text-main: #331C14;
+    --color-text-muted: #8C7B75;
+    --color-text-brand: #A83B1B;
 
-  --color-gold: #F5B800;
-  --color-coral-subtle: #FDF3EF;
+    --color-gold: #F5B800;
+    --color-coral-subtle: #FDF3EF;
+    --color-border-card: #F3ECE7;
 
-  --color-border-card: #F3ECE7;
+    /* State & Trend Accents */
+    --color-emerald: #10B981;
+    --color-trend-up: #10B981;
+    --color-trend-up-bg: #ECFDF5;
+
+    /* Translucent & Gauge Overlay Tokens */
+    --color-white-overlay-10: rgba(255, 255, 255, 0.1);
+    --color-white-overlay-20: rgba(255, 255, 255, 0.2);
+    --color-white-overlay-30: rgba(255, 255, 255, 0.3);
+    --color-white-overlay-40: rgba(255, 255, 255, 0.4);
+    --color-white-overlay-80: rgba(255, 255, 255, 0.8);
 }

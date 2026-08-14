@@ -18,10 +18,19 @@ export const colors = {
   coralSubtle: "#FDF3EF",
   borderCard: "#F3ECE7",
 
-  // Visual state accents
+  // Visual state & trend accents
   emerald: "#10B981",
+  trendUp: "#10B981",
+  trendUpBg: "#ECFDF5",
   mutedTrack: "#EAE0DA",
   white: "#FFFFFF",
+
+  // Translucent overlays
+  whiteOverlay10: "rgba(255, 255, 255, 0.1)",
+  whiteOverlay20: "rgba(255, 255, 255, 0.2)",
+  whiteOverlay30: "rgba(255, 255, 255, 0.3)",
+  whiteOverlay40: "rgba(255, 255, 255, 0.4)",
+  whiteOverlay80: "rgba(255, 255, 255, 0.8)",
 } as const;
 
 export type ThemeColors = typeof colors;

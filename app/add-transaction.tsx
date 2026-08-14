@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -26,6 +27,7 @@ const generateUUIDv4 = (): string => {
 
 export default function AddTransactionModal() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -102,7 +104,13 @@ export default function AddTransactionModal() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       className="flex-1 bg-bg-app"
     >
-      <View className="flex-1 pt-6 px-6">
+      <View
+        style={{
+          paddingTop: Math.max(insets.top, 16),
+          paddingBottom: Math.max(insets.bottom, 16),
+        }}
+        className="flex-1 px-6"
+      >
         {/* Header */}
         <View className="flex-row items-center justify-between mb-6">
           <Text className="text-text-main text-xl font-extrabold">
