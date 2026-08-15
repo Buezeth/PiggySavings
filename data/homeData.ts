@@ -25,6 +25,8 @@ export interface FeaturedGoalData {
   title: string;
   targetDate: string;
   priorityLabel: string;
+  categoryTag?: string;
+  encouragement?: string;
   currentAmount: number;
   targetAmount: number;
   currency: string;
@@ -38,7 +40,9 @@ export interface SavingsGoalItem {
   savedAmount: number;
   targetAmount: number;
   currency: string;
-  progressColorToken: "gold" | "primary";
+  progressColorToken: "gold" | "primary" | "emerald";
+  cardVariant: "gold" | "income" | "subtle" | "card";
+  categoryTag: string;
   iconName: string;
   iconFamily: "Ionicons" | "MaterialCommunityIcons";
 }
@@ -64,7 +68,7 @@ export const homeDashboardData: HomeDashboardData = {
         id: "total_saved",
         label: "Total Saved",
         value: "$12.4K",
-        change: "12%",
+        change: "+12%",
         trendDirection: "up",
       },
       {
@@ -88,6 +92,8 @@ export const homeDashboardData: HomeDashboardData = {
     title: "Dream Studio Setup",
     targetDate: "Target: Dec 2026",
     priorityLabel: "High Priority",
+    categoryTag: "💻 Work Setup",
+    encouragement: "🎉 Only $800 to go — you're almost at the finish line!",
     currentAmount: 3200,
     targetAmount: 4000,
     currency: "$",
@@ -102,6 +108,8 @@ export const homeDashboardData: HomeDashboardData = {
       targetAmount: 3000,
       currency: "$",
       progressColorToken: "gold",
+      cardVariant: "gold",
+      categoryTag: "✈️ Travel",
       iconName: "airplane-outline",
       iconFamily: "Ionicons",
     },
@@ -111,7 +119,9 @@ export const homeDashboardData: HomeDashboardData = {
       savedAmount: 7450,
       targetAmount: 8000,
       currency: "$",
-      progressColorToken: "primary",
+      progressColorToken: "emerald",
+      cardVariant: "income",
+      categoryTag: "🛡️ Safety Net",
       iconName: "shield-checkmark-outline",
       iconFamily: "Ionicons",
     },

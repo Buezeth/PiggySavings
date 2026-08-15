@@ -1,13 +1,12 @@
-import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useState } from "react";
+import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  // Biometric & Notification modules/flows are not installed/configured in the current project runtime.
-  // We mark both as unavailable, keep state false and disabled.
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const isBiometricsAvailable = false;
@@ -48,10 +47,7 @@ export default function ProfileScreen() {
   };
 
   const handleDataPrivacy = () => {
-    Alert.alert(
-      "Data Privacy",
-      "Local data storage and security parameters."
-    );
+    Alert.alert("Data Privacy", "Local data storage and security parameters.");
   };
 
   return (
@@ -64,27 +60,27 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4 mb-6">
-          <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider">
+          <Text className="text-text-muted text-xs font-bold uppercase tracking-wider">
             Account & Security
           </Text>
-          <Text className="text-text-main text-2xl font-bold mt-0.5">
+          <Text className="text-text-main text-2xl font-black mt-0.5">
             Profile & Settings 👤
           </Text>
         </View>
 
-        {/* User Profile Card */}
-        <View className="bg-bg-card rounded-3xl p-5 mb-6 border border-border-card shadow-sm flex-row items-center">
+        {/* User Profile CartoonCard */}
+        <CartoonCard className="mb-6 p-5 flex-row items-center">
           <View className="w-14 h-14 rounded-full bg-primary items-center justify-center mr-4">
-            <Text className="text-white text-xl font-bold">JD</Text>
+            <Text className="text-white text-xl font-black">JD</Text>
           </View>
           <View className="flex-1">
-            <Text className="text-text-main text-lg font-bold">Jane Doe</Text>
-            <Text className="text-text-muted text-xs font-medium mt-0.5">
+            <Text className="text-text-main text-lg font-black">Jane Doe</Text>
+            <Text className="text-text-muted text-xs font-bold mt-0.5">
               jane.doe@example.com
             </Text>
-            <View className="bg-coral-subtle self-start px-2.5 py-0.5 rounded-full mt-2">
-              <Text className="text-primary text-[10px] font-bold">
-                PRO SAVER MEMBER
+            <View className="bg-coral-subtle self-start px-3 py-1 rounded-full mt-2 border border-border-card">
+              <Text className="text-primary text-[10px] font-black uppercase tracking-wider">
+                🌟 Level 4 Saver
               </Text>
             </View>
           </View>
@@ -92,31 +88,31 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Edit Profile"
             onPress={handleEditProfile}
-            className="p-2"
+            className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center"
           >
-            <Ionicons name="create-outline" size={20} color={colors.textMuted} />
+            <Ionicons name="pencil" size={18} color={colors.primary} />
           </TouchableOpacity>
-        </View>
+        </CartoonCard>
 
         {/* Settings Group - Preferences */}
-        <Text className="text-text-main text-lg font-bold mb-3">
+        <Text className="text-text-main text-lg font-black tracking-tight mb-3">
           App Preferences
         </Text>
 
-        <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
+        <CartoonCard className="mb-6 p-4">
           {/* Security & Biometrics */}
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center flex-1 mr-3">
-              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="finger-print-outline" size={20} color={colors.primary} />
               </View>
               <View>
-                <Text className="text-text-main text-sm font-semibold">
+                <Text className="text-text-main text-sm font-black">
                   Biometric Unlock
                 </Text>
                 {!isBiometricsAvailable && (
-                  <Text className="text-text-muted text-xs font-normal mt-0.5">
-                    Unavailable on this device
+                  <Text className="text-text-muted text-xs font-bold mt-0.5">
+                    Unavailable on device
                   </Text>
                 )}
               </View>
@@ -133,16 +129,16 @@ export default function ProfileScreen() {
           {/* Smart Nudges & Notifications */}
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center flex-1 mr-3">
-              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="notifications-outline" size={20} color={colors.primary} />
               </View>
               <View>
-                <Text className="text-text-main text-sm font-semibold">
+                <Text className="text-text-main text-sm font-black">
                   Smart Nudges & Reminders
                 </Text>
                 {!isNotificationsAvailable && (
-                  <Text className="text-text-muted text-xs font-normal mt-0.5">
-                    Unavailable on this device
+                  <Text className="text-text-muted text-xs font-bold mt-0.5">
+                    Unavailable on device
                   </Text>
                 )}
               </View>
@@ -161,37 +157,39 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Auto-Allocation Rules"
             onPress={handleAutoAllocationRules}
+            activeOpacity={0.7}
             className="flex-row items-center justify-between py-3"
           >
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
                 <MaterialCommunityIcons name="cog-outline" size={20} color={colors.primary} />
               </View>
-              <Text className="text-text-main text-sm font-semibold">
+              <Text className="text-text-main text-sm font-black">
                 Auto-Allocation Rules
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
-        </View>
+        </CartoonCard>
 
         {/* Currency & Privacy */}
-        <Text className="text-text-main text-lg font-bold mb-3">
+        <Text className="text-text-main text-lg font-black tracking-tight mb-3">
           Security & Privacy
         </Text>
 
-        <View className="bg-bg-card rounded-3xl p-4 mb-6 border border-border-card shadow-sm">
+        <CartoonCard className="mb-6 p-4">
           <TouchableOpacity
             accessibilityRole="button"
             accessibilityLabel="Currency Settings"
             onPress={handleCurrencySettings}
+            activeOpacity={0.7}
             className="flex-row items-center justify-between py-3 border-b border-bg-app"
           >
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="cash-outline" size={20} color={colors.primary} />
               </View>
-              <Text className="text-text-main text-sm font-semibold">
+              <Text className="text-text-main text-sm font-black">
                 Currency (USD - $)
               </Text>
             </View>
@@ -202,20 +200,22 @@ export default function ProfileScreen() {
             accessibilityRole="button"
             accessibilityLabel="Data Privacy & Settings"
             onPress={handleDataPrivacy}
+            activeOpacity={0.7}
             className="flex-row items-center justify-between py-3"
           >
             <View className="flex-row items-center">
-              <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
                 <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
               </View>
-              <Text className="text-text-main text-sm font-semibold">
+              <Text className="text-text-main text-sm font-black">
                 Data Privacy
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
-        </View>
+        </CartoonCard>
       </ScrollView>
     </View>
   );
 }
+

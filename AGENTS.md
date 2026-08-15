@@ -67,31 +67,61 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 - Primary brand accent / Hero background: `bg-primary` (`#EE6A3B`), `bg-primary-dark` (`#D45427`), `bg-primary-light` (`#F48A64`)
 - Accent container / Highlight card: `bg-bg-accent` (`#E35D31`)
 - Pill & subtle highlight: `bg-coral-subtle` (`#FDF3EF`)
+- Income & Success backgrounds: `bg-emerald-subtle` (`#ECFDF5`), `bg-emerald` (`#10B981`)
+- Expense & Warning backgrounds: `bg-rose-subtle` (`#FFF1F2`), `bg-rose` (`#F43F5E`)
+- Streak & Milestone backgrounds: `bg-gold-subtle` (`#FEF3C7`), `bg-gold` (`#F5B800`)
 - Gauge & Translucent Overlays:
   - `bg-white-overlay-10` (`rgba(255, 255, 255, 0.1)`)
   - `bg-white-overlay-20` (`rgba(255, 255, 255, 0.2)`)
   - `bg-white-overlay-30` (`rgba(255, 255, 255, 0.3)`)
   - `bg-white-overlay-40` (`rgba(255, 255, 255, 0.4)`)
   - `bg-white-overlay-80` (`rgba(255, 255, 255, 0.8)`)
-- State & Success Badges: `bg-trend-up-bg` / `bg-emerald-subtle` (`#ECFDF5`), `bg-gold` (`#F5B800`)
 
 #### 2. Text Tokens
 - Primary cocoa body / numbers: `text-text-main` (`#331C14`)
 - Subtitles & muted labels: `text-text-muted` (`#8C7B75`)
 - Brand header accents: `text-text-brand` (`#A83B1B`)
 - Primary brand text: `text-primary` (`#EE6A3B`)
-- Savings indicators & milestones: `text-gold` (`#F5B800`)
-- Trends & Success metrics: `text-trend-up` / `text-emerald` (`#10B981`)
+- Savings indicators & milestones: `text-gold`, `text-gold-dark` (`#D97706`)
+- Trends & Success metrics: `text-trend-up` / `text-emerald` (`#10B981`), `text-emerald-dark` (`#059669`)
+- Expenses & Warnings: `text-rose` (`#F43F5E`), `text-rose-dark` (`#E11D48`)
 - Light text on brand surfaces: `text-white` (`#FFFFFF`), `text-white-overlay-80` (`rgba(255, 255, 255, 0.8)`)
 
-#### 3. Border & Divider Tokens
-- Standard card borders: `border-border-card` (`#F3ECE7`)
-- Primary brand borders: `border-primary` (`#EE6A3B`)
+#### 3. Border & Extruded 3D Bevel Tokens
+- Standard card & extruded bottom: `border-border-card` (`#F3ECE7`), `border-b-border-card-dark` (`#E2D5CC`)
+- Primary brand extruded borders: `border-primary-light` (`#F48A64`), `border-b-primary-dark` (`#D45427`)
+- Income / Emerald extruded borders: `border-emerald-border` (`#A7F3D0`), `border-b-emerald-border-dark` (`#6EE7B7`), `border-b-emerald-dark` (`#059669`)
+- Expense / Rose extruded borders: `border-rose-border` (`#FECDD3`), `border-b-rose-border-dark` (`#FDA4AF`), `border-b-rose-dark` (`#E11D48`)
+- Streak / Gold extruded borders: `border-gold-border` (`#FDE68A`), `border-b-gold-border-dark` (`#F59E0B`), `border-b-gold-dark` (`#D97706`)
 - Translucent hero borders: `border-white-overlay-10`, `border-white-overlay-20`
 
 #### 4. Shadow Tokens
 - Primary glow: `shadow-primary/20`, `shadow-primary/25`, `shadow-primary/35`
 - Elevation: `shadow-sm`, `shadow-md`, `shadow-lg`
+
+---
+
+## 🎮 Playful Cartoon / Gamified (Duolingo-Style) Visual Language
+
+PiggySavings embraces a vibrant, tactile, gamified aesthetic (inspired by Duolingo) designed to make saving feel playful and rewarding:
+
+### 1. Extruded 3D Cards & Buttons (`components/CartoonCard.tsx`)
+- All major content containers, modals, and primary action buttons **MUST** feature a 3D extruded bottom border (`border-2 ... border-b-4 ...`).
+- **Color Pairing Rule**: When changing the background of a card/button, **ALWAYS pair it with its corresponding darker extruded bottom border**:
+  - **Standard Card**: `bg-bg-card border-border-card border-b-border-card-dark`
+  - **Subtle Highlight**: `bg-coral-subtle border-border-card border-b-border-card-dark`
+  - **Primary Accent / Action**: `bg-primary border-primary-light border-b-primary-dark`
+  - **Income / Inflows**: `bg-emerald-subtle border-emerald-border border-b-emerald-border-dark` (or `bg-emerald border-emerald-light border-b-emerald-dark` for solid badges)
+  - **Expense / Outflows**: `bg-rose-subtle border-rose-border border-b-rose-border-dark` (or `bg-rose border-rose-light border-b-rose-dark` for solid badges)
+  - **Streak / Milestones**: `bg-gold-subtle border-gold-border border-b-gold-border-dark` (or `bg-gold border-gold-light border-b-gold-dark` for solid badges)
+- Use [`<CartoonCard variant="...">`](file:///c:/Users/CT_DEVS/Documents/Projects/PiggySavings/components/CartoonCard.tsx) for uniform rendering of these variants across screens.
+
+### 2. Flat Internal Elements vs. Chunky Containers
+- Keep nested icon badges, avatars, and progress tracks **flat and clean** (`bg-coral-subtle rounded-2xl` / `bg-bg-app rounded-full`) so the cards feel light and modern rather than visually cluttered.
+- Progress bars must maintain smooth single-tone fills without unnecessary beveling.
+
+### 3. Bold Gamified Typography
+- Use extra-bold and black font weights (`font-black` for headers/amounts/badges, `font-bold` for secondary labels) to match the punchy cartoony feel.
 
 ---
 
@@ -112,6 +142,5 @@ All agentic decisions, component implementations, schemas, and features **MUST**
    - This informs `react-native-css-interop` to pre-allocate variable slots on initial render, preventing unexpected component state resets, re-mount warnings (`ReactNativeCss`), and UI flickers.
 5. **Visual Hierarchy & Polish**:
    - Soft rounded corners (`rounded-3xl` / `rounded-2xl` / `rounded-b-[36px]`).
-   - Clean 3-column docked metric cards with dividers.
-   - High-contrast financial typography, trend indicators with directional arrows (`↑` / `↓`), and pill filters.
+   - High-contrast financial typography, trend indicators with directional arrows (`↑` / `↓`), and tactile pill filters.
 6. **Performance**: 0ms latency UI updates using optimistic local mutations before background synchronization.

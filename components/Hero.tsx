@@ -196,37 +196,44 @@ export const Hero: React.FC<HeroProps> = ({
         )}
       </View>
 
-      {/* 3-Column Metrics Stats Card */}
-      <View className="bg-bg-card rounded-2xl p-4 mt-3 -mb-12 flex-row items-center justify-between border border-border-card shadow-md">
+      {/* 3-Column Metrics Stats Card (Chunky Duolingo/Playful Style) */}
+      <View className="bg-bg-card rounded-3xl p-4 mt-3 -mb-12 flex-row items-center justify-between border-2 border-border-card border-b-4 border-b-border-card-dark shadow-sm">
         {data.metrics.map((metric, index) => {
           const isLast = index === data.metrics.length - 1;
           const isPositive = metric.trendDirection === "up";
 
           return (
             <React.Fragment key={metric.id}>
-              <View className={`flex-1 items-start ${index > 0 ? "pl-1" : ""}`}>
-                <Text className="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">
+              <View className={`flex-1 items-start ${index > 0 ? "pl-1.5" : ""}`}>
+                <Text className="text-text-muted text-[10px] font-black uppercase tracking-wider mb-1">
                   {metric.label}
                 </Text>
-                <Text className="text-text-main text-lg font-extrabold mb-1">
+                <Text className="text-text-main text-lg font-black tracking-tight mb-1.5">
                   {metric.value}
                 </Text>
-                <View className="flex-row items-center">
+                <View
+                  className={`flex-row items-center px-1.5 py-0.5 rounded-md border ${
+                    isPositive
+                      ? "bg-emerald-subtle border-emerald-border"
+                      : "bg-rose-subtle border-rose-border"
+                  }`}
+                >
                   <Ionicons
                     name={isPositive ? "arrow-up" : "arrow-down"}
-                    size={12}
-                    color={isPositive ? colors.trendUp : colors.primary}
+                    size={11}
+                    color={isPositive ? colors.emeraldDark : colors.roseDark}
                   />
                   <Text
-                    className={`text-[11px] font-bold ml-0.5 ${isPositive ? "text-trend-up" : "text-primary"
-                      }`}
+                    className={`text-[10px] font-black ml-0.5 ${
+                      isPositive ? "text-emerald-dark" : "text-rose-dark"
+                    }`}
                   >
                     {metric.change}
                   </Text>
                 </View>
               </View>
 
-              {!isLast && <View className="w-px h-9 bg-border-card mx-2" />}
+              {!isLast && <View className="w-px h-10 bg-border-card mx-2" />}
             </React.Fragment>
           );
         })}
