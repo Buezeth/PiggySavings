@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import { PiggyBank } from "./PiggyBank";
 
 interface HeroProps {
   data: HeroData;
@@ -33,21 +34,20 @@ export const Hero: React.FC<HeroProps> = ({
   const gaugePercent = Math.min(Math.max(healthScore / maxScore, 0.01), 1);
   const activeAngle = 180 + gaugePercent * 180;
 
-  // Responsive sizing: 78% of screen width (clamped for comfortable margins)
-  const gaugeWidth = Math.min(Math.max(Math.round(screenWidth * 0.78), 270), 340);
+  // Responsive sizing: 80% screen width
+  const gaugeWidth = Math.min(Math.max(Math.round(screenWidth * 0.8), 280), 345);
   const strokeWidth = 8;
   const radius = Math.round((gaugeWidth - 36) / 2);
   const centerX = gaugeWidth / 2;
-  const centerY = radius + strokeWidth + 14;
-  const containerHeight = centerY + 14;
+  const centerY = radius + strokeWidth + 16;
+  const containerHeight = centerY + 22;
 
-  // Start (180°) and End (360°) coordinates for the base semicircular arc
+  // Semicircular Arc Path Coordinates
   const startX = centerX - radius;
   const startY = centerY;
   const endX = centerX + radius;
   const endY = centerY;
 
-  // Background full semicircle SVG path: M startX startY A radius radius 0 0 1 endX endY
   const backgroundArcPath = `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${endX} ${endY}`;
 
   // Active progress target point
@@ -55,7 +55,6 @@ export const Hero: React.FC<HeroProps> = ({
   const activeEndX = centerX + radius * Math.cos(activeAngleRad);
   const activeEndY = centerY + radius * Math.sin(activeAngleRad);
 
-  // Active arc SVG path (smooth single vector stroke)
   const activeArcPath = `M ${startX} ${startY} A ${radius} ${radius} 0 0 1 ${activeEndX} ${activeEndY}`;
 
   // Glowing knob coordinates
@@ -80,8 +79,8 @@ export const Hero: React.FC<HeroProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Semicircular Gauge Section (75%-80% Screen Width) */}
-      <View className="items-center justify-center my-2">
+      {/* Semicircular Gauge Section with 3D Piggy Bank */}
+      <View className="items-center justify-center my-1">
         <View
           style={{ width: gaugeWidth, height: containerHeight }}
           className="relative items-center justify-center"
@@ -113,13 +112,13 @@ export const Hero: React.FC<HeroProps> = ({
             );
           })}
 
-          {/* Smooth Vector SVG Arc */}
+          {/* Smooth Vector SVG Arc Track */}
           <Svg
             width={gaugeWidth}
             height={containerHeight}
             style={{ position: "absolute", top: 0, left: 0 }}
           >
-            {/* Background Inactive Arc Track */}
+            {/* Inactive Track */}
             <Path
               d={backgroundArcPath}
               stroke={colors.whiteOverlay20}
@@ -127,7 +126,7 @@ export const Hero: React.FC<HeroProps> = ({
               strokeLinecap="round"
               fill="none"
             />
-            {/* Active Smooth Progress Arc */}
+            {/* Active Track */}
             <Path
               d={activeArcPath}
               stroke={colors.white}
@@ -151,28 +150,31 @@ export const Hero: React.FC<HeroProps> = ({
             <View className="w-3.5 h-3.5 rounded-full bg-bg-card shadow-md shadow-text-main/40" />
           </View>
 
-          {/* Inner Chamber: Dedicated Space for Animated PiggyBank SVG */}
+          {/* Center Chamber: 3D Piggy Bank & Score Readout */}
           <View
             style={{
               position: "absolute",
-              top: 32,
-              bottom: 8,
-              left: 20,
-              right: 20,
+              top: 14,
+              bottom: 4,
+              left: 10,
+              right: 10,
             }}
-            className="items-center justify-end"
+            className="items-center justify-center"
           >
-            {/* Place your animated PiggyBank SVG right here */}
-            <View className="items-center justify-center mb-1">
+            {/* 3D Piggy Character */}
+            <PiggyBank size={110} />
+
+            {/* Health Score Readout */}
+            <View className="items-center mt-1">
               <View className="flex-row items-baseline">
-                <Text className="text-white text-5xl font-black tracking-tight">
+                <Text className="text-white text-3xl font-black tracking-tight">
                   {healthScore}
                 </Text>
-                <Text className="text-white-overlay-80 text-base font-bold ml-1">
+                <Text className="text-white-overlay-80 text-sm font-bold ml-1">
                   /{maxScore}
                 </Text>
               </View>
-              <Text className="text-white-overlay-80 text-[11px] font-extrabold uppercase tracking-widest mt-0.5">
+              <Text className="text-white-overlay-80 text-[10px] font-extrabold uppercase tracking-widest mt-0.5">
                 Savings Health
               </Text>
             </View>
