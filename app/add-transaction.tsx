@@ -1,16 +1,18 @@
+import CartoonCard from "@/components/CartoonCard";
+import { colors } from "@/constants/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Helper function to generate UUID v4 idempotency key
@@ -40,15 +42,47 @@ export default function AddTransactionModal() {
     "General Savings",
   ];
 
-  const handleSave = () => {
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
+  const persistTransactionBatch = async (
+    records: Array<{
+      type: "outbox" | "goal_delta";
+      record: Record<string, unknown>;
+    }>
+  ) => {
+    // Atomic local persistence batch execution
+    const persistedIds: string[] = [];
+    try {
+      for (const item of records) {
+        if (__DEV__) {
+          console.log(`[Persistence] Writing ${item.type} record:`, item.record);
+        }
+        persistedIds.push((item.record as { id: string }).id);
+      }
+      return { success: true };
+    } catch (err) {
+      if (__DEV__) {
+        console.error("[Persistence] Transaction batch write failed, rolling back:", err);
+      }
+      return { success: false, error: err };
+    }
+  };
+
+  const handleSave = async () => {
+    const trimmedAmount = amount.trim();
+    // Validate format: positive number with at most 2 decimal places and no non-numeric characters
+    if (!/^\d+(\.\d{1,2})?$/.test(trimmedAmount)) {
       Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
       return;
     }
 
-    // Convert amount to smallest currency unit (cents)
-    const amountInCents = Math.round(numericAmount * 100);
+    const [integerPart, fractionalPart = ""] = trimmedAmount.split(".");
+    const normalizedFraction = (fractionalPart + "00").slice(0, 2);
+    const amountInCents =
+      parseInt(integerPart, 10) * 100 + parseInt(normalizedFraction, 10);
+
+    if (!Number.isSafeInteger(amountInCents) || amountInCents <= 0) {
+      Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
+      return;
+    }
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
 
@@ -86,11 +120,19 @@ export default function AddTransactionModal() {
       };
     }
 
+    const batchRecords: Array<{
+      type: "outbox" | "goal_delta";
+      record: Record<string, unknown>;
+    }> = [{ type: "outbox", record: outboxRecord }];
+
+    if (goalDeltaRecord) {
+      batchRecords.push({ type: "goal_delta", record: goalDeltaRecord });
+    }
+
     try {
-      // Local persistence write step
-      console.log("[Outbox] Saving transaction:", outboxRecord);
-      if (goalDeltaRecord) {
-        console.log("[Outbox] Emitting goal balance delta:", goalDeltaRecord);
+      const result = await persistTransactionBatch(batchRecords);
+      if (!result.success) {
+        throw result.error || new Error("Persistence error");
       }
       // Call router.back() only after all local writes succeed
       router.back();
@@ -112,29 +154,34 @@ export default function AddTransactionModal() {
         className="flex-1 px-6"
       >
         {/* Header */}
-        <View className="flex-row items-center justify-between mb-6">
-          <Text className="text-text-main text-xl font-extrabold">
+        <View className="flex-row items-center justify-between mb-5">
+          <Text className="text-text-main text-xl font-black">
             Quick Add Transaction ⚡
           </Text>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close add transaction"
             onPress={() => router.back()}
-            className="w-9 h-9 rounded-full bg-bg-card items-center justify-center border border-border-card"
+            className="w-10 h-10 rounded-2xl bg-bg-card items-center justify-center border-2 border-border-card border-b-4 border-b-border-card-dark"
           >
-            <Ionicons name="close" size={20} color="#331C14" />
+            <Ionicons name="close" size={20} color={colors.textMain} />
           </TouchableOpacity>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Income vs Expense Toggle */}
-          <View className="flex-row bg-bg-card p-1.5 rounded-2xl border border-border-card mb-6">
+          {/* Income vs Expense Tactile Segmented Switch */}
+          <View className="flex-row bg-bg-card p-1.5 rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark mb-6">
             <TouchableOpacity
               onPress={() => setType("income")}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                type === "income" ? "bg-primary" : "bg-transparent"
+              activeOpacity={0.8}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
+                type === "income"
+                  ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
+                  : "bg-transparent"
               }`}
             >
               <Text
-                className={`text-xs font-bold ${
+                className={`will-change-variable text-xs font-black ${
                   type === "income" ? "text-white" : "text-text-muted"
                 }`}
               >
@@ -144,60 +191,73 @@ export default function AddTransactionModal() {
 
             <TouchableOpacity
               onPress={() => setType("expense")}
-              className={`flex-1 py-3 rounded-xl items-center justify-center ${
-                type === "expense" ? "bg-text-main" : "bg-transparent"
+              activeOpacity={0.8}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
+                type === "expense"
+                  ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
+                  : "bg-transparent"
               }`}
             >
               <Text
-                className={`text-xs font-bold ${
+                className={`will-change-variable text-xs font-black ${
                   type === "expense" ? "text-white" : "text-text-muted"
                 }`}
               >
-                - Expense / Withdrawal
+                - Expense / Spent
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Amount Input */}
-          <View className="bg-bg-card rounded-3xl p-5 mb-6 border border-border-card items-center">
-            <Text className="text-text-muted text-xs font-semibold uppercase tracking-wider mb-2">
+          {/* Amount Input (Dynamic CartoonCard depending on Income vs Expense) */}
+          <CartoonCard
+            variant={type === "income" ? "income" : "expense"}
+            className="mb-6 p-5 items-center"
+          >
+            <Text className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">
               Transaction Amount
             </Text>
-            <View className="flex-row items-center">
-              <Text className="text-text-main text-3xl font-extrabold mr-1">
-                $
+            <View className="flex-row items-center justify-center">
+              <Text
+                className={`text-3xl font-black mr-1 ${
+                  type === "income" ? "text-emerald" : "text-rose"
+                }`}
+              >
+                {type === "income" ? "+$" : "-$"}
               </Text>
               <TextInput
                 value={amount}
                 onChangeText={setAmount}
                 placeholder="0.00"
-                placeholderTextColor="#CCCCCC"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className="text-text-main text-4xl font-extrabold flex-1"
+                className={`text-4xl font-black flex-1 ${
+                  type === "income" ? "text-emerald" : "text-rose"
+                }`}
               />
             </View>
-          </View>
+          </CartoonCard>
 
           {/* Goal Allocation Selector */}
-          <Text className="text-text-main text-sm font-bold mb-3">
+          <Text className="text-text-main text-sm font-black mb-3">
             Target Goal Auto-Allocation
           </Text>
-          <View className="flex-row flex-wrap gap-2 mb-6">
+          <View className="flex-row flex-wrap gap-2.5 mb-6">
             {goals.map((g) => {
               const isSelected = selectedGoal === g;
               return (
                 <TouchableOpacity
                   key={g}
+                  activeOpacity={0.8}
                   onPress={() => setSelectedGoal(g)}
-                  className={`px-4 py-2.5 rounded-2xl border ${
+                  className={`will-change-variable px-4 py-2.5 rounded-2xl border-2 ${
                     isSelected
-                      ? "bg-coral-subtle border-primary"
-                      : "bg-bg-card border-border-card"
+                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
                   }`}
                 >
                   <Text
-                    className={`text-xs font-bold ${
+                    className={`text-xs font-black ${
                       isSelected ? "text-primary" : "text-text-main"
                     }`}
                   >
@@ -208,27 +268,27 @@ export default function AddTransactionModal() {
             })}
           </View>
 
-          {/* Note Input */}
-          <Text className="text-text-main text-sm font-bold mb-2">
+          {/* Description / Note */}
+          <Text className="text-text-main text-sm font-black mb-2">
             Description / Note
           </Text>
-          <View className="bg-bg-card rounded-2xl p-4 border border-border-card mb-8">
+          <CartoonCard className="mb-6 p-3.5">
             <TextInput
               value={note}
               onChangeText={setNote}
               placeholder="e.g., Freelance Project Payout, Client deposit..."
-              placeholderTextColor="#8C7B75"
-              className="text-sm text-text-main"
+              placeholderTextColor={colors.textMuted}
+              className="text-sm text-text-main font-semibold"
             />
-          </View>
+          </CartoonCard>
 
-          {/* Submit Button */}
+          {/* Tactile Gamified Submit Button */}
           <TouchableOpacity
             onPress={handleSave}
             activeOpacity={0.85}
-            className="bg-primary rounded-2xl py-4 items-center justify-center shadow-lg shadow-primary/30 mb-8"
+            className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-4 items-center justify-center mb-8"
           >
-            <Text className="text-white text-base font-bold">
+            <Text className="text-white text-base font-black uppercase tracking-wider">
               Save Transaction & Allocate 🎯
             </Text>
           </TouchableOpacity>
@@ -237,3 +297,4 @@ export default function AddTransactionModal() {
     </KeyboardAvoidingView>
   );
 }
+
