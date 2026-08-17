@@ -7,45 +7,74 @@
 
 ## 💡 Project Identity & Product Requirements
 
-PiggySavings is a smart personal finance, goal-oriented savings, and budgeting mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, and modern mobile architectural practices.
+PiggySavings is a smart personal finance, goal-oriented savings, and budgeting mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, **Clerk Authentication**, **Supabase (PostgreSQL/RLS)**, and an **Offline-First SQLite Engine**.
 
-All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined in the core project documentation (`docs/Functionalities`).
+All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined below and in the core project documentation.
+
+---
+
+## 🏗️ System Architecture: Clerk + Supabase + Offline SQLite
+
+                       ┌──────────────────────────────┐
+                       │     Guest User (Offline)     │
+                       │  • Local SQLite Storage      │
+                       │  • expo-secure-store UUID    │
+                       └──────────────┬───────────────┘
+                                      │
+                         (User taps "Back up to Cloud")
+                                      │
+                                      ▼
+                       ┌──────────────────────────────┐
+                       │     Clerk Auth (Sign Up)     │
+                       │  • Issues JWT Token          │
+                       │  • Sub claim = Clerk User ID │
+                       └──────────────┬───────────────┘
+                                      │
+                               (Authenticated)
+                                      ▼
+                       ┌──────────────────────────────┐
+                       │      Supabase PostgreSQL     │
+                       │  • RLS scoped to Clerk `sub` │
+                       │  • RPC: `claim_guest_data()` │
+                       │  • 2-Way Delta Sync Outbox   │
+                       └──────────────────────────────┘
+
 
 ---
 
 ## 📑 Core Functional Specifications
 
-### 1. Data Model & Database Architecture
-* Refer to `1. Data Model and Database Schema Design.md`
-* Core entities: `Users`, `Wallets/Accounts`, `Categories`, `Transactions` (income, expense, transfer), `Savings Goals`, `Auto-Allocation Rules`, and `Sync Outbox`.
-* All transaction amounts are stored in cents/smallest currency unit or 2-decimal precision fixed numbers. Always attach `idempotency_key` (UUID v4) for offline/online transaction creation.
+### 1. Guest Mode & Optional Sign-Up (Zero Friction Onboarding)
+- **First Launch**: The app must never block the user with a mandatory login screen. Generate a persistent local Guest UUID in `expo-secure-store` and create a local record with `is_guest = 1`.
+- **Local Persistence**: All transactions, goals, recurring schedules, and auto-allocation rules must function 100% offline using `expo-sqlite`.
+- **Account Claiming & Migration**: When a guest signs up via Clerk:
+  1. Authenticate with Clerk and obtain a Supabase-compatible JWT token.
+  2. Invoke Supabase RPC `claim_guest_data(payload)` with all local SQLite tables inside an atomic transaction.
+  3. Update local SQLite state to `is_guest = 0`, bind the Clerk `user_id`, mark outbox records as synced, and activate the cloud 2-way delta sync.
 
-### 2. API & Endpoint Contracts
-* Refer to `2. API Endpoint or Contract Design.md`
-* Standard response wrapper `{ "success": boolean, "data": ..., "error": ... }`.
-* Mobile requests pass Bearer Token (`JWT`) in authorization headers.
+### 2. Scheduled Recurring Transactions & Savings Automation
+- **Database Entity**: `recurring_schedules` (supporting `daily`, `weekly`, `bi_weekly`, `custom_days` [e.g. every 15 days for paychecks], and `monthly`).
+- **Hybrid Execution Engine**:
+  - **Local (Guest/Offline)**: On app launch or foreground resume (`AppState`), query `next_occurrence <= date('now')`, insert transaction entries, compute next due date, and trigger the Goal Auto-Allocation Engine.
+  - **Cloud (Registered)**: Server-side cron/worker processes due occurrences and dispatches celebratory push notifications.
+- **Pay Yourself First (Auto-Allocation)**: Incoming paychecks automatically distribute funds across active goals based on configured percentages or fixed amounts, strictly respecting remaining goal caps to prevent over-saving.
 
-### 3. Goal Auto-Allocation Strategy
-* Refer to `3. Goal Auto-Allocation Strategy.md`
-* Automated distribution of incoming income into savings goals based on percentage, fixed amount, or remaining balance allocations.
-* Support priority ordering and fallback rules for goal auto-funding.
+### 3. Monetization Strategy: 3-Goal Limit + Rewarded Ads & Supporter Tip Jar
+- **Free Tier Limits**: Max **3 Active Goals** simultaneously.
+- **Goal Limit Interceptor**: If an un-entitled user attempts to create a 4th goal, display `<GoalLimitModal />`:
+  - **Option A (Rewarded Ad)**: Watch a short video ad to unlock $+1$ goal slot (`unlocked_goal_slots += 1`).
+  - **Option B (Supporter Tip Jar)**: One-time tip ($1.99, $4.99, $9.99) via In-App Purchase to unlock permanent **Unlimited Goals**, custom badges, and remove ad prompts.
+- All core budgeting, recurring transaction automation, insights, and offline logging remain **100% free and un-gated**.
 
-### 4. Push Notifications & Behavioral Nudges
-* Refer to `4. Push Notifications & Behavioral Nudges.md`
-* Micro-nudges, smart alerts, streak reminders, and budget threshold warnings.
-* Local scheduled notifications paired with server trigger payloads.
+### 4. Data Model & Atomic Financial Calculations
+- **Integer Cents Precision**: **NEVER** use standard floating-point numbers for money. All transaction amounts, goal targets, and balances **MUST** be stored as integer cents (`amount_cents INTEGER`, e.g., $10.50 stored as `1050`).
+- **Delta Event Logging Strategy**: Goal balances must **NEVER** be updated by overwriting absolute totals during sync. Always log and transmit delta increments (`+delta_cents` / `-delta_cents`) to prevent multi-device race condition overwrites.
+- **Idempotency**: Always attach a client-generated UUID v4 `idempotency_key` to offline and online transaction creations.
 
-### 5. Security & Data Privacy Architecture
-* Refer to `5. Security & Data Privacy Architecture.md`
-* Biometric authentication (Expo LocalAuthentication) for fast unlock.
-* Sensitive fields stored in `expo-secure-store`.
-* Zero plain-text financial log outputs in production.
-
-### 6. Offline-First & Delta Sync Strategy
-* Refer to `6. Offline-First Data Sync Strategy.md`
-* Local SQLite storage for zero-latency instant reads/writes.
-* 2-Way Delta Sync with Offline Outbox queue.
-* Goal balance synchronization MUST use **Delta Event Logging Strategy** (`+delta` / `-delta`) rather than replacing absolute balance totals to avoid conflict overwrites.
+### 5. Security & Privacy Architecture
+- Local authentication via `expo-local-authentication` (Biometrics / FaceID / Fingerprint).
+- Sensitive tokens and guest identifiers stored in `expo-secure-store`.
+- Row-Level Security (RLS) on all Supabase tables scoped to `(auth.jwt() ->> 'sub')::text`.
 
 ---
 
@@ -75,6 +104,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
   - `bg-white-overlay-20` (`rgba(255, 255, 255, 0.2)`)
   - `bg-white-overlay-30` (`rgba(255, 255, 255, 0.3)`)
   - `bg-white-overlay-40` (`rgba(255, 255, 255, 0.4)`)
+  - `bg-white-overlay-70` (`rgba(255, 255, 255, 0.7)`)
   - `bg-white-overlay-80` (`rgba(255, 255, 255, 0.8)`)
 
 #### 2. Text Tokens
@@ -103,7 +133,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 ## 🎮 Playful Cartoon / Gamified (Duolingo-Style) Visual Language
 
-PiggySavings embraces a vibrant, tactile, gamified aesthetic (inspired by Duolingo) designed to make saving feel playful and rewarding:
+PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make saving feel playful and rewarding:
 
 ### 1. Extruded 3D Cards & Buttons (`components/CartoonCard.tsx`)
 - All major content containers, modals, and primary action buttons **MUST** feature a 3D extruded bottom border (`border-2 ... border-b-4 ...`).
@@ -134,13 +164,7 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic (inspired by Duolin
      - Top padding: `paddingTop: Math.max(insets.top, 16)`
      - Bottom scroll content padding: `contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}`
    - **FORBIDDEN**: AI agents must **NEVER** use `<SafeAreaView>` wrapper components (from `react-native` or `react-native-safe-area-context`) or hardcoded fixed paddings (e.g. `paddingBottom: 40`, `pt-4`) for root screen layouts.
-   - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Instead, set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view to ensure seamless status bar and notch integration across iOS dynamic islands and Android edge-to-edge displays.
-3. **Speedometer & Arc Gauges**:
-   - Build lightweight, high-performance semi-circular gauges using geometric styling (radius, center-point calculations, glowing knob indicator, and radial tick marks) referencing overlay tokens (`colors.whiteOverlay20`, `colors.white`, etc.) without introducing heavy external binaries.
-4. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
+   - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view.
+3. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
    - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
-   - This informs `react-native-css-interop` to pre-allocate variable slots on initial render, preventing unexpected component state resets, re-mount warnings (`ReactNativeCss`), and UI flickers.
-5. **Visual Hierarchy & Polish**:
-   - Soft rounded corners (`rounded-3xl` / `rounded-2xl` / `rounded-b-[36px]`).
-   - High-contrast financial typography, trend indicators with directional arrows (`↑` / `↓`), and tactile pill filters.
-6. **Performance**: 0ms latency UI updates using optimistic local mutations before background synchronization.
+4. **Performance**: 0ms latency UI updates using optimistic local SQLite mutations before background synchronization.
