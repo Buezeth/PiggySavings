@@ -36,7 +36,7 @@ export default function InsightsScreen() {
               <Text className="text-text-brand text-xs font-black uppercase tracking-wider">
                 Smart Nudge
               </Text>
-              <View className="bg-primary/10 px-2 py-0.5 rounded-full">
+              <View className="bg-coral-subtle px-2 py-0.5 rounded-full">
                 <Text className="text-primary text-[10px] font-black uppercase">
                   Ahead of schedule
                 </Text>
@@ -97,7 +97,7 @@ export default function InsightsScreen() {
               Savings Rate
             </Text>
             <Text className="text-emerald text-2xl font-black">34.2%</Text>
-            <View className="bg-white/80 self-start px-2 py-0.5 rounded-md mt-2 border border-emerald-border">
+            <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-md mt-2 border border-emerald-border">
               <Text className="text-emerald-dark text-[10px] font-black">
                 Top 10% of savers
               </Text>
@@ -113,7 +113,7 @@ export default function InsightsScreen() {
               Savings Streak
             </Text>
             <Text className="text-gold-dark text-2xl font-black">12 Wks</Text>
-            <View className="bg-white/80 self-start px-2 py-0.5 rounded-md mt-2 border border-gold-border">
+            <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-md mt-2 border border-gold-border">
               <Text className="text-gold-dark text-[10px] font-black">
                 Personal best! 🔥
               </Text>
@@ -124,7 +124,7 @@ export default function InsightsScreen() {
         {/* Smart Tips / Gamified Challenge Card */}
         <CartoonCard variant="accent" className="p-5 mb-4">
           <View className="flex-row items-center justify-between mb-2">
-            <View className="bg-white/20 px-3 py-1 rounded-full border border-white-overlay-20">
+            <View className="bg-white-overlay-20 px-3 py-1 rounded-full border border-white-overlay-20">
               <Text className="text-white text-xs font-black uppercase tracking-wider">
                 Weekly Challenge
               </Text>

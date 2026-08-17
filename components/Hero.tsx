@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+import CartoonCard from "./CartoonCard";
 import { PiggyBank } from "./PiggyBank";
 
 interface HeroProps {
@@ -24,10 +25,14 @@ const TICK_ANGLES = Array.from({ length: 21 }, (_, i) => 180 + i * 9);
 
 export const Hero: React.FC<HeroProps> = ({
   data,
+  selectedPeriod = "30D",
+  onSelectPeriod,
   onNotificationPress,
 }) => {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
+
+  const periods: TimePeriod[] = ["7D", "30D", "90D"];
 
   const healthScore = data.healthScore;
   const maxScore = data.maxHealthScore || 100;
@@ -67,8 +72,33 @@ export const Hero: React.FC<HeroProps> = ({
       style={{ paddingTop: Math.max(insets.top, 16) }}
       className="will-change-variable w-full bg-primary pb-0 mb-8 px-5"
     >
-      {/* Top Bar with Notification Icon */}
-      <View className="flex-row items-center justify-end mb-1">
+      {/* Top Bar with Period Selector & Notification Icon */}
+      <View className="flex-row items-center justify-between mb-1">
+        <View className="flex-row bg-white-overlay-20 p-1 rounded-full border border-white-overlay-10">
+          {periods.map((p) => {
+            const isSelected = selectedPeriod === p;
+            return (
+              <TouchableOpacity
+                key={p}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${p} period`}
+                onPress={() => onSelectPeriod?.(p)}
+                className={`will-change-variable px-3 py-1 rounded-full ${
+                  isSelected ? "bg-bg-card shadow-sm" : "bg-transparent"
+                }`}
+              >
+                <Text
+                  className={`will-change-variable text-xs font-black ${
+                    isSelected ? "text-primary" : "text-white"
+                  }`}
+                >
+                  {p}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <TouchableOpacity
           accessibilityRole="button"
           accessibilityLabel="Notifications & Nudges"
@@ -197,7 +227,10 @@ export const Hero: React.FC<HeroProps> = ({
       </View>
 
       {/* 3-Column Metrics Stats Card (Chunky Duolingo/Playful Style) */}
-      <View className="bg-bg-card rounded-3xl p-4 mt-3 -mb-12 flex-row items-center justify-between border-2 border-border-card border-b-4 border-b-border-card-dark shadow-sm">
+      <CartoonCard
+        variant="card"
+        className="mt-3 -mb-12 flex-row items-center justify-between"
+      >
         {data.metrics.map((metric, index) => {
           const isLast = index === data.metrics.length - 1;
           const isPositive = metric.trendDirection === "up";
@@ -237,7 +270,7 @@ export const Hero: React.FC<HeroProps> = ({
             </React.Fragment>
           );
         })}
-      </View>
+      </CartoonCard>
     </View>
   );
 };

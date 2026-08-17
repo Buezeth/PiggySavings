@@ -152,7 +152,7 @@ export default function ActivityScreen() {
                 className={`will-change-variable ${chipClasses}`}
               >
                 <Text
-                  className={`text-xs font-black capitalize ${
+                  className={`will-change-variable text-xs font-black capitalize ${
                     isSelected ? "text-white" : "text-text-muted"
                   }`}
                 >
@@ -193,7 +193,7 @@ export default function ActivityScreen() {
               >
                 <View className="flex-row items-center flex-1 pr-2">
                   <View
-                    className={`w-11 h-11 rounded-2xl items-center justify-center mr-3 ${
+                    className={`will-change-variable w-11 h-11 rounded-2xl items-center justify-center mr-3 ${
                       item.isIncome ? "bg-emerald" : "bg-rose"
                     }`}
                   >
@@ -211,7 +211,7 @@ export default function ActivityScreen() {
                       {item.category} • {item.date}
                     </Text>
                     {item.goalAllocated && (
-                      <View className="bg-white/80 self-start px-2 py-0.5 rounded-lg mt-1.5 border border-border-card">
+                      <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-lg mt-1.5 border border-border-card">
                         <Text className="text-text-main text-[10px] font-black">
                           🎯 {item.goalAllocated}
                         </Text>
@@ -221,7 +221,7 @@ export default function ActivityScreen() {
                 </View>
 
                 <Text
-                  className={`text-base font-black ${
+                  className={`will-change-variable text-base font-black ${
                     item.isIncome ? "text-emerald" : "text-rose"
                   }`}
                 >

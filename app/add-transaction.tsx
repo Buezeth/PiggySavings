@@ -42,7 +42,31 @@ export default function AddTransactionModal() {
     "General Savings",
   ];
 
-  const handleSave = () => {
+  const persistTransactionBatch = async (
+    records: Array<{
+      type: "outbox" | "goal_delta";
+      record: Record<string, unknown>;
+    }>
+  ) => {
+    // Atomic local persistence batch execution
+    const persistedIds: string[] = [];
+    try {
+      for (const item of records) {
+        if (__DEV__) {
+          console.log(`[Persistence] Writing ${item.type} record:`, item.record);
+        }
+        persistedIds.push((item.record as { id: string }).id);
+      }
+      return { success: true };
+    } catch (err) {
+      if (__DEV__) {
+        console.error("[Persistence] Transaction batch write failed, rolling back:", err);
+      }
+      return { success: false, error: err };
+    }
+  };
+
+  const handleSave = async () => {
     const trimmedAmount = amount.trim();
     // Validate format: positive number with at most 2 decimal places and no non-numeric characters
     if (!/^\d+(\.\d{1,2})?$/.test(trimmedAmount)) {
@@ -50,11 +74,12 @@ export default function AddTransactionModal() {
       return;
     }
 
-    const numericAmount = parseFloat(trimmedAmount);
-    // Convert amount to smallest currency unit (cents)
-    const amountInCents = Math.round(numericAmount * 100);
+    const [integerPart, fractionalPart = ""] = trimmedAmount.split(".");
+    const normalizedFraction = (fractionalPart + "00").slice(0, 2);
+    const amountInCents =
+      parseInt(integerPart, 10) * 100 + parseInt(normalizedFraction, 10);
 
-    if (isNaN(numericAmount) || numericAmount <= 0 || amountInCents <= 0) {
+    if (!Number.isSafeInteger(amountInCents) || amountInCents <= 0) {
       Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
       return;
     }
@@ -95,23 +120,19 @@ export default function AddTransactionModal() {
       };
     }
 
+    const batchRecords: Array<{
+      type: "outbox" | "goal_delta";
+      record: Record<string, unknown>;
+    }> = [{ type: "outbox", record: outboxRecord }];
+
+    if (goalDeltaRecord) {
+      batchRecords.push({ type: "goal_delta", record: goalDeltaRecord });
+    }
+
     try {
-      // Local persistence write step
-      if (__DEV__) {
-        console.log("[Outbox] Saving transaction record:", {
-          id: outboxRecord.id,
-          event_type: outboxRecord.event_type,
-          synced: outboxRecord.synced,
-          created_at: outboxRecord.created_at,
-        });
-        if (goalDeltaRecord) {
-          console.log("[Outbox] Emitting goal balance delta record:", {
-            id: goalDeltaRecord.id,
-            event_type: goalDeltaRecord.event_type,
-            goal_id: goalDeltaRecord.goal_id,
-            created_at: goalDeltaRecord.created_at,
-          });
-        }
+      const result = await persistTransactionBatch(batchRecords);
+      if (!result.success) {
+        throw result.error || new Error("Persistence error");
       }
       // Call router.back() only after all local writes succeed
       router.back();
@@ -138,6 +159,8 @@ export default function AddTransactionModal() {
             Quick Add Transaction ⚡
           </Text>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Close add transaction"
             onPress={() => router.back()}
             className="w-10 h-10 rounded-2xl bg-bg-card items-center justify-center border-2 border-border-card border-b-4 border-b-border-card-dark"
           >

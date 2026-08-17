@@ -114,7 +114,7 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic (inspired by Duolin
   - **Income / Inflows**: `bg-emerald-subtle border-emerald-border border-b-emerald-border-dark` (or `bg-emerald border-emerald-light border-b-emerald-dark` for solid badges)
   - **Expense / Outflows**: `bg-rose-subtle border-rose-border border-b-rose-border-dark` (or `bg-rose border-rose-light border-b-rose-dark` for solid badges)
   - **Streak / Milestones**: `bg-gold-subtle border-gold-border border-b-gold-border-dark` (or `bg-gold border-gold-light border-b-gold-dark` for solid badges)
-- Use [`<CartoonCard variant="...">`](file:///c:/Users/CT_DEVS/Documents/Projects/PiggySavings/components/CartoonCard.tsx) for uniform rendering of these variants across screens.
+- Use [`<CartoonCard variant="...">`](./components/CartoonCard.tsx) for uniform rendering of these variants across screens.
 
 ### 2. Flat Internal Elements vs. Chunky Containers
 - Keep nested icon badges, avatars, and progress tracks **flat and clean** (`bg-coral-subtle rounded-2xl` / `bg-bg-app rounded-full`) so the cards feel light and modern rather than visually cluttered.

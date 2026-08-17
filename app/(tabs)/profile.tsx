@@ -1,7 +1,12 @@
 import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import * as LocalAuthentication from "expo-local-authentication";
+import {
+  getPermissionsAsync,
+  requestPermissionsAsync,
+} from "expo-notifications/build/NotificationPermissions";
+import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,10 +14,47 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const isBiometricsAvailable = false;
-  const isNotificationsAvailable = false;
+  const [isBiometricsAvailable, setIsBiometricsAvailable] = useState(false);
+  const [isNotificationsAvailable, setIsNotificationsAvailable] = useState(false);
 
-  const handleBiometricsToggle = (value: boolean) => {
+  useEffect(() => {
+    let isMounted = true;
+
+    async function checkCapabilities() {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        if (isMounted) {
+          setIsBiometricsAvailable(hasHardware && isEnrolled);
+        }
+      } catch {
+        if (isMounted) {
+          setIsBiometricsAvailable(false);
+        }
+      }
+
+      try {
+        const { status } = await getPermissionsAsync();
+        if (isMounted) {
+          const granted = status === "granted";
+          setIsNotificationsAvailable(true);
+          setNotificationsEnabled(granted);
+        }
+      } catch {
+        if (isMounted) {
+          setIsNotificationsAvailable(false);
+        }
+      }
+    }
+
+    checkCapabilities();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleBiometricsToggle = async (value: boolean) => {
     if (!isBiometricsAvailable) {
       Alert.alert(
         "Biometrics Unavailable",
@@ -20,10 +62,25 @@ export default function ProfileScreen() {
       );
       return;
     }
-    setBiometricsEnabled(value);
+
+    if (value) {
+      try {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Authenticate to enable Biometric Unlock",
+          fallbackLabel: "Use Passcode",
+        });
+        if (result.success) {
+          setBiometricsEnabled(true);
+        }
+      } catch {
+        Alert.alert("Authentication Error", "Unable to complete biometric authentication.");
+      }
+    } else {
+      setBiometricsEnabled(false);
+    }
   };
 
-  const handleNotificationsToggle = (value: boolean) => {
+  const handleNotificationsToggle = async (value: boolean) => {
     if (!isNotificationsAvailable) {
       Alert.alert(
         "Notifications Unavailable",
@@ -31,7 +88,25 @@ export default function ProfileScreen() {
       );
       return;
     }
-    setNotificationsEnabled(value);
+
+    if (value) {
+      try {
+        const { status } = await requestPermissionsAsync();
+        if (status === "granted") {
+          setNotificationsEnabled(true);
+        } else {
+          setNotificationsEnabled(false);
+          Alert.alert(
+            "Permission Required",
+            "Please enable notification permissions in your device settings to receive smart nudges."
+          );
+        }
+      } catch {
+        setNotificationsEnabled(false);
+      }
+    } else {
+      setNotificationsEnabled(false);
+    }
   };
 
   const handleEditProfile = () => {

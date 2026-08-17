@@ -50,7 +50,7 @@ export default function GoalsHomeScreen() {
           {/* Featured Goal Card (Tactile Coral-Subtle CartoonCard) */}
           <CartoonCard variant="subtle" className="p-5 mb-6">
             <View className="flex-row items-center justify-between mb-3">
-              <View className="bg-primary/10 px-2.5 py-0.5 rounded-full border border-primary/20">
+              <View className="bg-coral-subtle px-2.5 py-0.5 rounded-full border border-border-card">
                 <Text className="text-primary text-[10px] font-black uppercase tracking-wide">
                   {featuredGoal.categoryTag || "💻 Work Setup"}
                 </Text>
@@ -105,7 +105,7 @@ export default function GoalsHomeScreen() {
             </View>
 
             {/* Encouragement / Milestone Banner */}
-            <View className="bg-white/80 p-2.5 rounded-2xl border border-border-card flex-row items-center">
+            <View className="bg-white-overlay-80 p-2.5 rounded-2xl border border-border-card flex-row items-center">
               <Text className="text-text-main text-xs font-bold flex-1">
                 {featuredGoal.encouragement || "🎉 Almost there! Keep up the great savings pace."}
               </Text>
@@ -177,7 +177,7 @@ export default function GoalsHomeScreen() {
                     </View>
 
                     <View
-                      className={`bg-white/80 px-2 py-0.5 rounded-lg border ${badgeBorderClass}`}
+                      className={`bg-white-overlay-80 px-2 py-0.5 rounded-lg border ${badgeBorderClass}`}
                     >
                       <Text
                         className={`${amountTextClass} text-[10px] font-black`}
@@ -201,7 +201,7 @@ export default function GoalsHomeScreen() {
                   </Text>
 
                   {/* Playful Progress Bar */}
-                  <View className="h-2.5 bg-white/70 rounded-full overflow-hidden border border-white-overlay-20">
+                  <View className="h-2.5 bg-white-overlay-70 rounded-full overflow-hidden border border-white-overlay-20">
                     <View
                       style={{ width: `${progressPercent}%` }}
                       className={`h-full ${progressFillClass} rounded-full`}
@@ -229,7 +229,7 @@ export default function GoalsHomeScreen() {
                 Auto-saving $25 on Friday keeps your 12-week streak alive! 🔥
               </Text>
             </View>
-            <View className="w-9 h-9 rounded-full bg-white/20 items-center justify-center border border-white-overlay-20">
+            <View className="w-9 h-9 rounded-full bg-white-overlay-20 items-center justify-center border border-white-overlay-20">
               <Ionicons name="chevron-forward" size={18} color={colors.white} />
             </View>
           </CartoonCard>
