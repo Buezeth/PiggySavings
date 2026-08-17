@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PiggySavings",
-    "slug": "PiggySavings",
+    "slug": "piggysavings-goal-saving-and-budgeting",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -38,11 +38,19 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "aafa4485-2b13-4366-9425-a519fa7101f7"
+      }
+    },
+    "owner": "buezeth-ct-dev"
   }
 }
