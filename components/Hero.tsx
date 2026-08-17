@@ -83,14 +83,12 @@ export const Hero: React.FC<HeroProps> = ({
                 accessibilityRole="button"
                 accessibilityLabel={`Select ${p} period`}
                 onPress={() => onSelectPeriod?.(p)}
-                className={`will-change-variable px-3 py-1 rounded-full ${
-                  isSelected ? "bg-bg-card shadow-sm" : "bg-transparent"
-                }`}
+                className={`will-change-variable px-3 py-1 rounded-full ${isSelected ? "bg-bg-card shadow-sm" : "bg-transparent"
+                  }`}
               >
                 <Text
-                  className={`will-change-variable text-xs font-black ${
-                    isSelected ? "text-primary" : "text-white"
-                  }`}
+                  className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-white"
+                    }`}
                 >
                   {p}
                 </Text>
@@ -245,11 +243,10 @@ export const Hero: React.FC<HeroProps> = ({
                   {metric.value}
                 </Text>
                 <View
-                  className={`flex-row items-center px-1.5 py-0.5 rounded-md border ${
-                    isPositive
-                      ? "bg-emerald-subtle border-emerald-border"
-                      : "bg-rose-subtle border-rose-border"
-                  }`}
+                  className={`flex-row items-center px-1.5 py-0.5 rounded-md border ${isPositive
+                    ? "bg-emerald-subtle border-emerald-border"
+                    : "bg-rose-subtle border-rose-border"
+                    }`}
                 >
                   <Ionicons
                     name={isPositive ? "arrow-up" : "arrow-down"}
@@ -257,9 +254,8 @@ export const Hero: React.FC<HeroProps> = ({
                     color={isPositive ? colors.emeraldDark : colors.roseDark}
                   />
                   <Text
-                    className={`text-[10px] font-black ml-0.5 ${
-                      isPositive ? "text-emerald-dark" : "text-rose-dark"
-                    }`}
+                    className={`text-[10px] font-black ml-0.5 ${isPositive ? "text-emerald-dark" : "text-rose-dark"
+                      }`}
                   >
                     {metric.change}
                   </Text>
