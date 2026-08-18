@@ -26,9 +26,13 @@ export async function showRewardedGoalUnlockAd(
       // 2. Persist reward in SQLite
       const updatedEntitlements = await unlockGoalSlot();
 
-      // 3. Trigger optional listener / state refresh
+      // 3. Trigger optional listener / state refresh safely
       if (onRewardEarned) {
-        await onRewardEarned(updatedEntitlements.unlocked_goal_slots);
+        try {
+          await onRewardEarned(updatedEntitlements.unlocked_goal_slots);
+        } catch (listenerErr) {
+          console.warn("[AdService] onRewardEarned listener error:", listenerErr);
+        }
       }
 
       return {

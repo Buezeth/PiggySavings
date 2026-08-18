@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -16,6 +16,7 @@ import { processTipPurchase } from "../services/monetization/paymentService";
 
 export interface TipTier {
   id: "coffee" | "pizza" | "super_piggy";
+  productId: string;
   title: string;
   price: string;
   iconName: keyof typeof MaterialCommunityIcons.glyphMap;
@@ -30,6 +31,7 @@ export interface TipTier {
 export const TIP_TIERS: TipTier[] = [
   {
     id: "coffee",
+    productId: "piggysavings_tip_coffee",
     title: "Small Coffee",
     price: "$1.99",
     iconName: "coffee",
@@ -41,6 +43,7 @@ export const TIP_TIERS: TipTier[] = [
   },
   {
     id: "pizza",
+    productId: "piggysavings_tip_pizza",
     title: "Pizza Slice",
     price: "$4.99",
     iconName: "pizza",
@@ -57,6 +60,7 @@ export const TIP_TIERS: TipTier[] = [
   },
   {
     id: "super_piggy",
+    productId: "piggysavings_tip_super_piggy",
     title: "Super Piggy",
     price: "$9.99",
     iconName: "rocket-launch",
@@ -94,16 +98,25 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [purchasedTier, setPurchasedTier] = useState<TipTier | null>(null);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handlePurchase = async (tier: TipTier) => {
     setIsProcessing(true);
     setPurchaseError(null);
 
     try {
-      // 1. Process and verify real payment transaction via paymentService
+      // 1. Process and verify real payment transaction via paymentService using product identifier
       const purchaseResult = await processTipPurchase({
         tierId: tier.id,
-        price: tier.price,
+        productId: tier.productId,
       });
 
       if (!purchaseResult.success) {
@@ -121,7 +134,11 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
         onSuccess();
       }
 
-      setTimeout(() => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+
+      successTimeoutRef.current = setTimeout(() => {
         setPurchasedTier(null);
         setIsProcessing(false);
         onClose();
@@ -282,41 +299,37 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
           )}
 
           {/* Action button */}
-          {!purchasedTier && (
-            <View className="mt-2">
-              <CartoonCard
-                variant="accent"
-                interactive
-                onPress={() => {
-                  const currentTier =
-                    TIP_TIERS.find((t) => t.id === selectedTierId) ??
-                    TIP_TIERS[1];
-                  handlePurchase(currentTier);
-                }}
-                className="p-3.5 items-center flex-row justify-center"
-              >
-                {isProcessing ? (
-                  <ActivityIndicator size="small" color={colors.white} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="heart"
-                      size={18}
-                      color={colors.white}
-                      style={{ marginRight: 8 }}
-                    />
-                    <Text className="text-white font-black text-sm tracking-wide">
-                      {`Support with ${
-                        TIP_TIERS.find((t) => t.id === selectedTierId)?.title
-                      } (${
-                        TIP_TIERS.find((t) => t.id === selectedTierId)?.price
-                      })`}
-                    </Text>
-                  </>
-                )}
-              </CartoonCard>
-            </View>
-          )}
+          {!purchasedTier && (() => {
+            const selectedTier =
+              TIP_TIERS.find((t) => t.id === selectedTierId) ?? TIP_TIERS[1];
+
+            return (
+              <View className="mt-2">
+                <CartoonCard
+                  variant="accent"
+                  interactive
+                  onPress={() => handlePurchase(selectedTier)}
+                  className="p-3.5 items-center flex-row justify-center"
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color={colors.white} />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="heart"
+                        size={18}
+                        color={colors.white}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text className="text-white font-black text-sm tracking-wide">
+                        {`Support with ${selectedTier.title} (${selectedTier.price})`}
+                      </Text>
+                    </>
+                  )}
+                </CartoonCard>
+              </View>
+            );
+          })()}
           </CartoonCard>
         </Pressable>
       </Pressable>

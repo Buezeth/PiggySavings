@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -41,6 +41,15 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adSuccessMessage, setAdSuccessMessage] = useState<string | null>(null);
   const [adErrorMessage, setAdErrorMessage] = useState<string | null>(null);
+  const adTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (adTimeoutRef.current) {
+        clearTimeout(adTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleWatchAd = async () => {
     setIsWatchingAd(true);
@@ -58,7 +67,12 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
       if (onUnlockedSlot) {
         onUnlockedSlot();
       }
-      setTimeout(() => {
+
+      if (adTimeoutRef.current) {
+        clearTimeout(adTimeoutRef.current);
+      }
+
+      adTimeoutRef.current = setTimeout(() => {
         setAdSuccessMessage(null);
         onClose();
       }, 1200);

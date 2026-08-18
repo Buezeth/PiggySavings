@@ -6,7 +6,7 @@ export interface PurchaseResult {
 
 export interface ProcessPurchaseOptions {
   tierId: string;
-  price: string;
+  productId?: string;
 }
 
 /**
