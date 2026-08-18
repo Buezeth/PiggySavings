@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { getDatabase } from "../services/db/database";
+import { getDatabase, runInExclusiveTransaction } from "../services/db/database";
 import { GoalRow, GoalStatus, CardVariant } from "../services/db/types";
 
 export interface CreateGoalInput {
@@ -186,7 +186,7 @@ export async function updateGoal(
 
 /**
  * Apply atomic delta to a goal balance and record an audit row in goal_contributions.
- * Ensures strict integer cents precision and ACID compliance via withTransactionAsync.
+ * Ensures strict integer cents precision and ACID compliance via platform-aware exclusive transactions.
  */
 export async function applyGoalDelta(
   goalId: string,
@@ -199,9 +199,9 @@ export async function applyGoalDelta(
   const contributionId = Crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await db.withTransactionAsync(async () => {
+  await runInExclusiveTransaction(db, async (txn) => {
     // 1. Atomic SQL update to goal balance
-    const result = await db.runAsync(
+    const result = await txn.runAsync(
       `UPDATE goals
        SET current_amount_cents = current_amount_cents + ?,
            updated_at = ?
@@ -214,7 +214,7 @@ export async function applyGoalDelta(
     }
 
     // 2. Record contribution row
-    await db.runAsync(
+    await txn.runAsync(
       `INSERT INTO goal_contributions (
         id,
         goal_id,

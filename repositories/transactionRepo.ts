@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { getDatabase } from "../services/db/database";
+import { getDatabase, runInExclusiveTransaction } from "../services/db/database";
 import {
   TransactionRow,
   TransactionType,
@@ -72,9 +72,9 @@ export async function insertTransaction(
   const txDate = tx.transaction_date ?? now;
   const roundedAmountCents = Math.round(tx.amount_cents);
 
-  await db.withTransactionAsync(async () => {
+  await runInExclusiveTransaction(db, async (txn) => {
     // 1. Insert transaction
-    await db.runAsync(
+    await txn.runAsync(
       `INSERT INTO transactions (
         id,
         category_id,
@@ -102,7 +102,7 @@ export async function insertTransaction(
       const roundedGoalCents = Math.round(goalAllocation.amount_cents);
       const contributionId = Crypto.randomUUID();
 
-      const updateResult = await db.runAsync(
+      const updateResult = await txn.runAsync(
         `UPDATE goals
          SET current_amount_cents = current_amount_cents + ?,
              updated_at = ?
@@ -116,7 +116,7 @@ export async function insertTransaction(
         );
       }
 
-      await db.runAsync(
+      await txn.runAsync(
         `INSERT INTO goal_contributions (
           id,
           goal_id,

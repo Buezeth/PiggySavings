@@ -1,9 +1,51 @@
+import { Platform } from "react-native";
 import * as SQLite from "expo-sqlite";
 
 export const DB_NAME = "piggysavings.db";
 export const CURRENT_SCHEMA_VERSION = 1;
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+
+/**
+ * Web-safe mutex queue to serialize transactions when running on web
+ */
+let webTxnMutex = Promise.resolve();
+
+/**
+ * Executes a transaction across native and web platforms.
+ * On native (iOS/Android): uses db.withExclusiveTransactionAsync with the txn object.
+ * On web: serializes execution using a JS mutex and runs within db.withTransactionAsync.
+ */
+export async function runInExclusiveTransaction<T = void>(
+  db: SQLite.SQLiteDatabase,
+  task: (txn: SQLite.SQLiteDatabase) => Promise<T>
+): Promise<T> {
+  if (Platform.OS === "web") {
+    let releaseMutex: () => void = () => {};
+    const nextInQueue = new Promise<void>((resolve) => {
+      releaseMutex = resolve;
+    });
+    const currentMutex = webTxnMutex;
+    webTxnMutex = webTxnMutex.then(() => nextInQueue);
+
+    await currentMutex;
+    try {
+      let result: T;
+      await db.withTransactionAsync(async () => {
+        result = await task(db);
+      });
+      return result!;
+    } finally {
+      releaseMutex();
+    }
+  }
+
+  let result: T;
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    result = await task(txn as unknown as SQLite.SQLiteDatabase);
+  });
+  return result!;
+}
 
 /**
  * Returns the open SQLiteDatabase singleton instance.
@@ -51,9 +93,9 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
   const currentVersion = versionResult?.user_version ?? 0;
 
   if (currentVersion < CURRENT_SCHEMA_VERSION) {
-    await db.withExclusiveTransactionAsync(async () => {
+    await runInExclusiveTransaction(db, async (txn) => {
       // 1. user_preferences table
-      await db.execAsync(`
+      await txn.execAsync(`
         CREATE TABLE IF NOT EXISTS user_preferences (
           id TEXT PRIMARY KEY NOT NULL,
           preferred_currency TEXT NOT NULL DEFAULT 'USD',
@@ -153,9 +195,9 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_allocation_active ON allocation_rules (is_active);
         CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status);
       `);
-    });
 
-    await db.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
+      await txn.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
+    });
   }
 }
 

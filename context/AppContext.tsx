@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -97,10 +98,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Monotonically increasing generation ref to track latest refreshData invocation
+  const refreshGenerationRef = useRef(0);
+
   /**
    * Refreshes all core entities from SQLite asynchronously.
+   * Tracks generation to avoid stale overlapping invocations overwriting current data.
    */
   const refreshData = useCallback(async () => {
+    const currentGeneration = ++refreshGenerationRef.current;
+
     try {
       setIsLoading(true);
       setError(null);
@@ -119,17 +126,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getAllCategories(),
       ]);
 
-      setGoals(fetchedGoals);
-      setTransactions(fetchedTransactions);
-      setCashflowSummary(fetchedCashflow);
-      setEntitlements(fetchedEntitlements);
-      setCategories(fetchedCategories);
-      setIsReady(true);
+      // Only update state if this is still the most recent refresh invocation
+      if (currentGeneration === refreshGenerationRef.current) {
+        setGoals(fetchedGoals);
+        setTransactions(fetchedTransactions);
+        setCashflowSummary(fetchedCashflow);
+        setEntitlements(fetchedEntitlements);
+        setCategories(fetchedCategories);
+        setIsReady(true);
+      }
     } catch (err) {
       console.error("[AppContext] refreshData failed:", err);
-      setError(err instanceof Error ? err.message : "Failed to load app data");
+      if (currentGeneration === refreshGenerationRef.current) {
+        setError(err instanceof Error ? err.message : "Failed to load app data");
+      }
     } finally {
-      setIsLoading(false);
+      if (currentGeneration === refreshGenerationRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
