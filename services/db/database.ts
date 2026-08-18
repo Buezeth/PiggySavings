@@ -50,10 +50,10 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
   const versionResult = await db.getFirstAsync<{ user_version: number }>(
     "PRAGMA user_version;"
   );
-  let currentVersion = versionResult?.user_version ?? 0;
+  const currentVersion = versionResult?.user_version ?? 0;
 
-  if (currentVersion < 1) {
-    await db.withTransactionAsync(async () => {
+  if (currentVersion < CURRENT_SCHEMA_VERSION) {
+    await db.withExclusiveTransactionAsync(async () => {
       // 1. user_preferences table
       await db.execAsync(`
         CREATE TABLE IF NOT EXISTS user_preferences (
@@ -179,11 +179,10 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_allocation_active ON allocation_rules (is_active);
         CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status);
       `);
-    });
 
-    // Update PRAGMA user_version after transaction succeeds
-    await db.execAsync(`PRAGMA user_version = 1;`);
-    currentVersion = 1;
+      // Update PRAGMA user_version inside the exclusive transaction using CURRENT_SCHEMA_VERSION
+      await db.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
+    });
   }
 }
 
