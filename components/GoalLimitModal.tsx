@@ -43,15 +43,28 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
   const [adErrorMessage, setAdErrorMessage] = useState<string | null>(null);
   const adTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const clearAdTimeout = () => {
+    if (adTimeoutRef.current) {
+      clearTimeout(adTimeoutRef.current);
+      adTimeoutRef.current = null;
+    }
+  };
+
   useEffect(() => {
     return () => {
-      if (adTimeoutRef.current) {
-        clearTimeout(adTimeoutRef.current);
-      }
+      clearAdTimeout();
     };
   }, []);
 
+  const handleClose = () => {
+    clearAdTimeout();
+    setAdSuccessMessage(null);
+    setAdErrorMessage(null);
+    onClose();
+  };
+
   const handleWatchAd = async () => {
+    clearAdTimeout();
     setIsWatchingAd(true);
     setAdSuccessMessage(null);
     setAdErrorMessage(null);
@@ -68,13 +81,9 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
         onUnlockedSlot();
       }
 
-      if (adTimeoutRef.current) {
-        clearTimeout(adTimeoutRef.current);
-      }
-
+      clearAdTimeout();
       adTimeoutRef.current = setTimeout(() => {
-        setAdSuccessMessage(null);
-        onClose();
+        handleClose();
       }, 1200);
     } else if (result.error) {
       setAdErrorMessage(result.error);
@@ -82,8 +91,8 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
   };
 
   const handleBecomeSupporter = () => {
-    onClose();
     if (onOpenTipJar) {
+      handleClose();
       onOpenTipJar();
     }
   };
@@ -93,10 +102,10 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <Pressable
-        onPress={onClose}
+        onPress={handleClose}
         className="flex-1 bg-black-overlay-60 items-center justify-center p-5"
       >
         <Pressable
@@ -107,7 +116,7 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
             {/* Close Button */}
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={onClose}
+              onPress={handleClose}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center z-10"
               accessibilityLabel="Close goal limit dialog"
             >
@@ -200,27 +209,29 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
               </CartoonCard>
 
               {/* Action B: Become a Supporter ($2.99 / Unlimited) */}
-              <CartoonCard
-                variant="gold"
-                interactive
-                onPress={handleBecomeSupporter}
-                className="p-3.5 mb-2 items-center flex-row justify-center"
-              >
-                <MaterialCommunityIcons
-                  name="coffee"
-                  size={20}
-                  color={colors.goldDark}
-                  style={{ marginRight: 8 }}
-                />
-                <Text className="text-gold-dark font-black text-sm tracking-wide">
-                  Become a Supporter ($2.99 / Unlimited)
-                </Text>
-              </CartoonCard>
+              {onOpenTipJar ? (
+                <CartoonCard
+                  variant="gold"
+                  interactive
+                  onPress={handleBecomeSupporter}
+                  className="p-3.5 mb-2 items-center flex-row justify-center"
+                >
+                  <MaterialCommunityIcons
+                    name="coffee"
+                    size={20}
+                    color={colors.goldDark}
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text className="text-gold-dark font-black text-sm tracking-wide">
+                    Become a Supporter ($2.99 / Unlimited)
+                  </Text>
+                </CartoonCard>
+              ) : null}
 
               {/* Maybe Later */}
               <TouchableOpacity
                 activeOpacity={0.7}
-                onPress={onClose}
+                onPress={handleClose}
                 className="py-2.5 items-center justify-center"
               >
                 <Text className="text-text-muted text-xs font-black uppercase tracking-wider">
