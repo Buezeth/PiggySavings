@@ -15,7 +15,7 @@ export interface CreateRecurringScheduleInput {
   day_of_month?: number | null;
   start_date: string;
   next_occurrence?: string;
-  is_active?: number;
+  is_active?: 0 | 1;
 }
 
 /**

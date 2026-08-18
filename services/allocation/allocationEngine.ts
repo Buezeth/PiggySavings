@@ -63,6 +63,17 @@ export async function evaluateAutoAllocations(
       params.push(categoryId);
     }
 
+    query += `
+      ORDER BY 
+        CASE r.type
+          WHEN 'fixed_cents' THEN 1
+          WHEN 'percentage' THEN 2
+          ELSE 3
+        END ASC,
+        r.created_at ASC,
+        r.id ASC;
+    `;
+
     type JoinedRuleRow = AllocationRuleRow & {
       goal_title: string;
       target_amount_cents: number;

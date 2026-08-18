@@ -1,5 +1,5 @@
 import "../global.css";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, AppState, AppStateStatus, Text, TouchableOpacity, View } from "react-native";
 import { Stack } from "expo-router";
 import { initDatabase } from "../services/db/database";
@@ -10,6 +10,7 @@ import { AppProvider } from "../context/AppContext";
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
+  const isProcessingRecurringRef = useRef(false);
 
   const prepare = useCallback(async () => {
     try {
@@ -35,10 +36,15 @@ export default function RootLayout() {
     const subscription = AppState.addEventListener(
       "change",
       (nextAppState: AppStateStatus) => {
-        if (nextAppState === "active") {
-          processDueRecurringSchedules().catch((err) => {
-            console.error("Background recurring schedules processing error:", err);
-          });
+        if (nextAppState === "active" && isReady && !isProcessingRecurringRef.current) {
+          isProcessingRecurringRef.current = true;
+          processDueRecurringSchedules()
+            .catch((err) => {
+              console.error("Background recurring schedules processing error:", err);
+            })
+            .finally(() => {
+              isProcessingRecurringRef.current = false;
+            });
         }
       }
     );
@@ -46,7 +52,7 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [isReady]);
 
   if (initError) {
     return (
