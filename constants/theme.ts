@@ -68,6 +68,8 @@ export const colors = {
   whiteOverlay40: "rgba(255, 255, 255, 0.4)",
   whiteOverlay70: "rgba(255, 255, 255, 0.7)",
   whiteOverlay80: "rgba(255, 255, 255, 0.8)",
+  blackOverlay60: "rgba(0, 0, 0, 0.6)",
+  overlayBackdrop: "rgba(0, 0, 0, 0.6)",
 } as const;
 
 export type ThemeColors = typeof colors;

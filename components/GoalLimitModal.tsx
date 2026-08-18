@@ -40,10 +40,12 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
   const { refreshData } = useApp();
   const [isWatchingAd, setIsWatchingAd] = useState(false);
   const [adSuccessMessage, setAdSuccessMessage] = useState<string | null>(null);
+  const [adErrorMessage, setAdErrorMessage] = useState<string | null>(null);
 
   const handleWatchAd = async () => {
     setIsWatchingAd(true);
     setAdSuccessMessage(null);
+    setAdErrorMessage(null);
 
     const result = await showRewardedGoalUnlockAd(async () => {
       await refreshData();
@@ -60,6 +62,8 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
         setAdSuccessMessage(null);
         onClose();
       }, 1200);
+    } else if (result.error) {
+      setAdErrorMessage(result.error);
     }
   };
 
@@ -79,7 +83,7 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
     >
       <Pressable
         onPress={onClose}
-        className="flex-1 bg-black/60 items-center justify-center p-5"
+        className="flex-1 bg-black-overlay-60 items-center justify-center p-5"
       >
         <Pressable
           onPress={(e) => e.stopPropagation()}
@@ -142,6 +146,15 @@ export const GoalLimitModal: React.FC<GoalLimitModalProps> = ({
               <View className="bg-emerald-subtle p-3 rounded-2xl border-2 border-emerald-border mb-4 items-center">
                 <Text className="text-emerald-dark font-black text-sm">
                   {adSuccessMessage}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Error message banner */}
+            {adErrorMessage ? (
+              <View className="bg-rose-subtle p-3 rounded-2xl border-2 border-rose-border mb-4 items-center">
+                <Text className="text-rose-dark font-bold text-xs text-center">
+                  {adErrorMessage}
                 </Text>
               </View>
             ) : null}

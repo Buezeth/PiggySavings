@@ -18,12 +18,12 @@ import {
 import {
   getActiveGoals,
   getAllGoals,
-  createGoal as createGoalInRepo,
   updateGoal as updateGoalInRepo,
   applyGoalDelta as applyGoalDeltaInRepo,
   CreateGoalInput,
   UpdateGoalInput,
 } from "../repositories/goalRepo";
+import { createGuardedGoal } from "../services/monetization/entitlementGuard";
 import {
   getTransactions,
   getCashflowSummary,
@@ -178,11 +178,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Create a new savings goal.
+   * Create a new savings goal guarded by user entitlements.
    */
   const createGoal = useCallback(
     async (goalInput: CreateGoalInput): Promise<GoalRow> => {
-      const newGoal = await createGoalInRepo(goalInput);
+      const newGoal = await createGuardedGoal(goalInput);
       setGoals((prev) => [newGoal, ...prev]);
       return newGoal;
     },

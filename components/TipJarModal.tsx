@@ -12,6 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { CartoonCard, CartoonCardVariant } from "./CartoonCard";
 import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
+import { processTipPurchase } from "../services/monetization/paymentService";
 
 export interface TipTier {
   id: "coffee" | "pizza" | "super_piggy";
@@ -81,7 +82,7 @@ export interface TipJarModalProps {
 /**
  * TipJarModal:
  * Tactile Cartoon modal displaying 3 Supporter Tip Tiers.
- * On successful purchase, grants supporter status and sets unlocked goal slots to 999 (unlimited).
+ * On verified purchase, grants supporter status and sets unlocked goal slots to 999 (unlimited).
  */
 export const TipJarModal: React.FC<TipJarModalProps> = ({
   visible,
@@ -91,19 +92,31 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
   const { setSupporterStatus, refreshData } = useApp();
   const [selectedTierId, setSelectedTierId] = useState<string>("pizza");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [purchasedTier, setPurchasedTier] = useState<string | null>(null);
+  const [purchasedTier, setPurchasedTier] = useState<TipTier | null>(null);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   const handlePurchase = async (tier: TipTier) => {
     setIsProcessing(true);
-    try {
-      // Simulate purchase transaction latency (500ms)
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    setPurchaseError(null);
 
-      // Persist supporter status and slots in SQLite
+    try {
+      // 1. Process and verify real payment transaction via paymentService
+      const purchaseResult = await processTipPurchase({
+        tierId: tier.id,
+        price: tier.price,
+      });
+
+      if (!purchaseResult.success) {
+        setPurchaseError(purchaseResult.error ?? "Payment verification failed.");
+        setIsProcessing(false);
+        return;
+      }
+
+      // 2. Only upon verified transaction: persist supporter status and slots in SQLite
       await setSupporterStatus(true, tier.unlockedSlots);
       await refreshData();
 
-      setPurchasedTier(tier.title);
+      setPurchasedTier(tier);
       if (onSuccess) {
         onSuccess();
       }
@@ -115,6 +128,9 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
       }, 1500);
     } catch (err) {
       console.error("[TipJarModal] purchase error:", err);
+      setPurchaseError(
+        err instanceof Error ? err.message : "Failed to process payment."
+      );
       setIsProcessing(false);
     }
   };
@@ -128,12 +144,13 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
     >
       <Pressable
         onPress={onClose}
-        className="flex-1 bg-black/60 items-center justify-end sm:justify-center p-4"
+        className="flex-1 bg-black-overlay-60 items-center justify-end sm:justify-center p-4"
       >
         <Pressable
           onPress={(e) => e.stopPropagation()}
-          className="w-full max-w-md bg-bg-card rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark p-5 overflow-hidden"
+          className="w-full max-w-md"
         >
+          <CartoonCard variant="card" className="p-5 relative overflow-hidden">
           {/* Close Button */}
           <TouchableOpacity
             activeOpacity={0.7}
@@ -161,6 +178,15 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
             </Text>
           </View>
 
+          {/* Error State */}
+          {purchaseError ? (
+            <View className="bg-rose-subtle p-3.5 rounded-2xl border-2 border-rose-border mb-3 items-center">
+              <Text className="text-rose-dark font-bold text-xs text-center">
+                {purchaseError}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Purchase Success State */}
           {purchasedTier ? (
             <View className="bg-emerald-subtle p-5 rounded-3xl border-2 border-emerald-border mb-4 items-center">
@@ -169,7 +195,9 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
                 Thank You for Supporting!
               </Text>
               <Text className="text-emerald-dark text-xs font-bold text-center mt-1">
-                {`Unlocked ${purchasedTier} perks & unlimited goal slots.`}
+                {purchasedTier.unlockedSlots >= 999
+                  ? `Unlocked ${purchasedTier.title} perks & permanent unlimited goal slots.`
+                  : `Unlocked ${purchasedTier.title} perks & ${purchasedTier.unlockedSlots} active goal slots.`}
               </Text>
             </View>
           ) : (
@@ -289,6 +317,7 @@ export const TipJarModal: React.FC<TipJarModalProps> = ({
               </CartoonCard>
             </View>
           )}
+          </CartoonCard>
         </Pressable>
       </Pressable>
     </Modal>
