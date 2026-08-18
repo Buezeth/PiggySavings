@@ -68,11 +68,12 @@ export async function unlockGoalSlot(): Promise<UserEntitlementRow> {
 }
 
 /**
- * Sets supporter status (e.g. after in-app purchase / tip).
+ * Sets supporter status and optionally updates unlocked goal slots (e.g. 999 for unlimited).
  * Ensures the default entitlement row exists and exactly one row is updated within the transaction.
  */
 export async function setSupporterStatus(
-  isSupporter: boolean
+  isSupporter: boolean,
+  unlockedGoalSlots: number = 999
 ): Promise<UserEntitlementRow> {
   const db = await getDatabase();
 
@@ -87,9 +88,18 @@ export async function setSupporterStatus(
     // 2. Perform atomic update
     const result = await txn.runAsync(
       `UPDATE user_entitlements
-       SET is_supporter = ?
+       SET is_supporter = ?,
+           unlocked_goal_slots = CASE 
+             WHEN ? = 1 THEN MAX(unlocked_goal_slots, ?) 
+             ELSE unlocked_goal_slots 
+           END
        WHERE id = ?;`,
-      [isSupporter ? 1 : 0, DEFAULT_ENTITLEMENTS_ID]
+      [
+        isSupporter ? 1 : 0,
+        isSupporter ? 1 : 0,
+        unlockedGoalSlots,
+        DEFAULT_ENTITLEMENTS_ID,
+      ]
     );
 
     if (result.changes !== 1) {
