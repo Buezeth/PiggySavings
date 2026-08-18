@@ -22,10 +22,8 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
  * Configure standard SQLite PRAGMAs for performance and relational integrity.
  */
 async function configurePragmas(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.execAsync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-  `);
+  await db.execAsync("PRAGMA journal_mode = WAL;");
+  await db.execAsync("PRAGMA foreign_keys = ON;");
 }
 
 /**
@@ -63,10 +61,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           reminders_enabled INTEGER NOT NULL DEFAULT 1,
           created_at TEXT NOT NULL
         );
-      `);
 
-      // 2. categories table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS categories (
           id TEXT PRIMARY KEY NOT NULL,
           name TEXT NOT NULL,
@@ -76,10 +71,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           color_code TEXT,
           is_default INTEGER NOT NULL DEFAULT 0
         );
-      `);
 
-      // 3. goals table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS goals (
           id TEXT PRIMARY KEY NOT NULL,
           title TEXT NOT NULL,
@@ -95,10 +87,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
-      `);
 
-      // 4. transactions table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS transactions (
           id TEXT PRIMARY KEY NOT NULL,
           category_id TEXT NOT NULL,
@@ -110,10 +99,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           created_at TEXT NOT NULL,
           FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT
         );
-      `);
 
-      // 5. goal_contributions table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS goal_contributions (
           id TEXT PRIMARY KEY NOT NULL,
           goal_id TEXT NOT NULL,
@@ -124,10 +110,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE,
           FOREIGN KEY (transaction_id) REFERENCES transactions (id) ON DELETE SET NULL
         );
-      `);
 
-      // 6. recurring_schedules table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS recurring_schedules (
           id TEXT PRIMARY KEY NOT NULL,
           category_id TEXT NOT NULL,
@@ -143,10 +126,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           created_at TEXT NOT NULL,
           FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE RESTRICT
         );
-      `);
 
-      // 7. allocation_rules table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS allocation_rules (
           id TEXT PRIMARY KEY NOT NULL,
           goal_id TEXT NOT NULL,
@@ -158,20 +138,14 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE,
           FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
         );
-      `);
 
-      // 8. user_entitlements table
-      await db.execAsync(`
         CREATE TABLE IF NOT EXISTS user_entitlements (
           id TEXT PRIMARY KEY NOT NULL,
           unlocked_goal_slots INTEGER NOT NULL DEFAULT 3,
           is_supporter INTEGER NOT NULL DEFAULT 0,
           ads_watched_count INTEGER NOT NULL DEFAULT 0
         );
-      `);
 
-      // Indexes for high-frequency queries
-      await db.execAsync(`
         CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (transaction_date DESC);
         CREATE INDEX IF NOT EXISTS idx_transactions_category ON transactions (category_id);
         CREATE INDEX IF NOT EXISTS idx_contributions_goal ON goal_contributions (goal_id);
@@ -179,10 +153,9 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_allocation_active ON allocation_rules (is_active);
         CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status);
       `);
-
-      // Update PRAGMA user_version inside the exclusive transaction using CURRENT_SCHEMA_VERSION
-      await db.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
     });
+
+    await db.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
   }
 }
 

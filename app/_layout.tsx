@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { Stack } from "expo-router";
 import { initDatabase } from "../services/db/database";
 import colors from "../constants/theme";
+import { AppProvider } from "../context/AppContext";
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -99,16 +100,18 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen
-        name="add-transaction"
-        options={{
-          presentation: "modal",
-          animation: "slide_from_bottom",
-        }}
-      />
-    </Stack>
+    <AppProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen
+          name="add-transaction"
+          options={{
+            presentation: "modal",
+            animation: "slide_from_bottom",
+          }}
+        />
+      </Stack>
+    </AppProvider>
   );
 }
 
