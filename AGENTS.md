@@ -7,74 +7,70 @@
 
 ## 💡 Project Identity & Product Requirements
 
-PiggySavings is a smart personal finance, goal-oriented savings, and budgeting mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, **Clerk Authentication**, **Supabase (PostgreSQL/RLS)**, and an **Offline-First SQLite Engine**.
+PiggySavings is a privacy-first, goal-oriented personal finance and smart savings mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, and a **100% Zero-Backend, Local-First Architecture** (`expo-sqlite` + `expo-secure-store`).
 
-All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined below and in the core project documentation.
+There are **zero hosted server databases and zero mandatory account creation requirements**. Users retain 100% ownership of their financial data, backed up directly to their personal cloud storage (Google Drive AppData / iCloud / encrypted local file export).
+
+All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined below.
 
 ---
 
-## 🏗️ System Architecture: Clerk + Supabase + Offline SQLite
+## 🏗️ Zero-Backend System Architecture (Local-First + Personal Cloud)
 
+```text
                        ┌──────────────────────────────┐
-                       │     Guest User (Offline)     │
-                       │  • Local SQLite Storage      │
-                       │  • expo-secure-store UUID    │
+                       │     Local-First Device       │
+                       │  • expo-sqlite DB            │
+                       │  • expo-secure-store Tokens  │
+                       │  • On-Device Recurring Engine│
+                       │  • Local Notification Nudges │
                        └──────────────┬───────────────┘
                                       │
-                         (User taps "Back up to Cloud")
+                         (Backup & Restore Actions)
                                       │
-                                      ▼
-                       ┌──────────────────────────────┐
-                       │     Clerk Auth (Sign Up)     │
-                       │  • Issues JWT Token          │
-                       │  • Sub claim = Clerk User ID │
-                       └──────────────┬───────────────┘
-                                      │
-                               (Authenticated)
-                                      ▼
-                       ┌──────────────────────────────┐
-                       │      Supabase PostgreSQL     │
-                       │  • RLS scoped to Clerk `sub` │
-                       │  • RPC: `claim_guest_data()` │
-                       │  • 2-Way Delta Sync Outbox   │
-                       └──────────────────────────────┘
-
+                 ┌────────────────────┼────────────────────┐
+                 ▼                    ▼                    ▼
+     [ Google Drive AppData ]   [ iCloud / iOS Files ]   [ Encrypted File Export ]
+     • Hidden app data folder   • Private App Container  • .piggysave / JSON bundle
+     • Zero server costs        • Native iOS sync        • Share via AirDrop/Email
+```
 
 ---
 
 ## 📑 Core Functional Specifications
 
-### 1. Guest Mode & Optional Sign-Up (Zero Friction Onboarding)
-- **First Launch**: The app must never block the user with a mandatory login screen. Generate a persistent local Guest UUID in `expo-secure-store` and create a local record with `is_guest = 1`.
-- **Local Persistence**: All transactions, goals, recurring schedules, and auto-allocation rules must function 100% offline using `expo-sqlite`.
-- **Account Claiming & Migration**: When a guest signs up via Clerk:
-  1. Authenticate with Clerk and obtain a Supabase-compatible JWT token.
-  2. Invoke Supabase RPC `claim_guest_data(payload)` with all local SQLite tables inside an atomic transaction.
-  3. Update local SQLite state to `is_guest = 0`, bind the Clerk `user_id`, mark outbox records as synced, and activate the cloud 2-way delta sync.
+### 1. Zero-Backend & Accountless Privacy Architecture
+- **Zero Mandatory Sign-Up**: The app opens directly to the dashboard with 0ms latency. No email, password, or third-party server account is required.
+- **Local SQLite Engine (`expo-sqlite`)**: All financial ledgers, categories, savings goals, recurring rules, and entitlement metadata reside exclusively on the user's physical device.
+- **Personal Cloud Backup & Restore**:
+  - **Google Drive (`appDataFolder`)**: Backs up encrypted database snapshots directly to the user's hidden Google Drive application folder (completely private and isolated from accidental deletion).
+  - **Encrypted File Export / Import**: Users can export or import their `.piggysave` / `.json` backup file anytime via `expo-sharing` and `expo-document-picker`.
 
 ### 2. Scheduled Recurring Transactions & Savings Automation
-- **Database Entity**: `recurring_schedules` (supporting `daily`, `weekly`, `bi_weekly`, `custom_days` [e.g. every 15 days for paychecks], and `monthly`).
-- **Hybrid Execution Engine**:
-  - **Local (Guest/Offline)**: On app launch or foreground resume (`AppState`), query `next_occurrence <= date('now')`, insert transaction entries, compute next due date, and trigger the Goal Auto-Allocation Engine.
-  - **Cloud (Registered)**: Server-side cron/worker processes due occurrences and dispatches celebratory push notifications.
-- **Pay Yourself First (Auto-Allocation)**: Incoming paychecks automatically distribute funds across active goals based on configured percentages or fixed amounts, strictly respecting remaining goal caps to prevent over-saving.
+- **Local Engine (`services/recurring/recurringEngine.ts`)**:
+  - Runs on app launch and foreground resume (`AppState.addEventListener`).
+  - Checks `recurring_schedules` where `next_occurrence <= date('now')` and `is_active = 1`.
+  - Automatically records due salary paychecks, subscriptions, utilities, and transport expenses.
+  - Computes the next occurrence interval (e.g. every 15 days, monthly, weekly).
+- **Pay Yourself First (Auto-Allocation Engine)**:
+  - When an incoming paycheck is logged, `services/allocation/allocationEngine.ts` calculates rule splits (percentage or fixed amounts) and routes savings to active goals.
+  - Respects remaining goal balance caps to prevent over-saving.
 
 ### 3. Monetization Strategy: 3-Goal Limit + Rewarded Ads & Supporter Tip Jar
 - **Free Tier Limits**: Max **3 Active Goals** simultaneously.
 - **Goal Limit Interceptor**: If an un-entitled user attempts to create a 4th goal, display `<GoalLimitModal />`:
   - **Option A (Rewarded Ad)**: Watch a short video ad to unlock $+1$ goal slot (`unlocked_goal_slots += 1`).
-  - **Option B (Supporter Tip Jar)**: One-time tip ($1.99, $4.99, $9.99) via In-App Purchase to unlock permanent **Unlimited Goals**, custom badges, and remove ad prompts.
-- All core budgeting, recurring transaction automation, insights, and offline logging remain **100% free and un-gated**.
+  - **Option B (Supporter Tip Jar)**: One-time tip ($1.99, $4.99, $9.99) via In-App Purchase to unlock permanent **Unlimited Goals**, custom badges, and remove all ad prompts.
+- All core budgeting tools, recurring transaction automation, analytics, insights, and offline capabilities remain **100% free and un-gated forever**.
 
 ### 4. Data Model & Atomic Financial Calculations
 - **Integer Cents Precision**: **NEVER** use standard floating-point numbers for money. All transaction amounts, goal targets, and balances **MUST** be stored as integer cents (`amount_cents INTEGER`, e.g., $10.50 stored as `1050`).
-- **Delta Event Logging Strategy**: Goal balances must **NEVER** be updated by overwriting absolute totals during sync. Always log and transmit delta increments (`+delta_cents` / `-delta_cents`) to prevent multi-device race condition overwrites.
-- **Idempotency**: Always attach a client-generated UUID v4 `idempotency_key` to offline and online transaction creations.
+- **Atomic Balance Updates**: Goal balances and transaction entries must always execute within atomic database transactions (`db.withTransactionAsync`) to guarantee ACID compliance.
+- **Client Idempotency**: Attach client UUID v4 `idempotency_key` to all transaction and contribution creations to prevent double insertions.
 
-### 5. Security & Privacy Architecture
-- Local authentication via `expo-local-authentication` (Biometrics / FaceID / Fingerprint).
-- Sensitive tokens and guest identifiers stored in `expo-secure-store`.
-- Row-Level Security (RLS) on all Supabase tables scoped to `(auth.jwt() ->> 'sub')::text`.
+### 5. On-Device Push Notifications & Behavioral Nudges
+- **100% Local Scheduling (`expo-notifications`)**: No remote push servers.
+- Schedules daily logging reminders, weekly progress summaries, milestone celebrations (25%, 50%, 75%, 100%), and streak nudges directly on the operating system's local notification daemon.
 
 ---
 
@@ -167,4 +163,4 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make sa
    - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view.
 3. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
    - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
-4. **Performance**: 0ms latency UI updates using optimistic local SQLite mutations before background synchronization.
+1. **Performance**: 0ms latency UI updates using local SQLite queries and optimistic state updates.
