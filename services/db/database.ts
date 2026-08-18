@@ -1,5 +1,5 @@
-import { Platform } from "react-native";
 import * as SQLite from "expo-sqlite";
+import { Platform } from "react-native";
 
 export const DB_NAME = "piggysavings.db";
 export const CURRENT_SCHEMA_VERSION = 1;
@@ -21,7 +21,7 @@ export async function runInExclusiveTransaction<T = void>(
   task: (txn: SQLite.SQLiteDatabase) => Promise<T>
 ): Promise<T> {
   if (Platform.OS === "web") {
-    let releaseMutex: () => void = () => {};
+    let releaseMutex: () => void = () => { };
     const nextInQueue = new Promise<void>((resolve) => {
       releaseMutex = resolve;
     });
@@ -309,7 +309,7 @@ export const DEFAULT_CATEGORIES = [
 ] as const;
 
 /**
- * Seeds default categories, user preferences, and entitlements if they do not already exist.
+ * Seeds default categories, user preferences, and entitlements if they do not already exist. 
  */
 async function seedDefaultData(db: SQLite.SQLiteDatabase): Promise<void> {
   const now = new Date().toISOString();
