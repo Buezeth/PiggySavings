@@ -62,57 +62,17 @@ export async function getGoalById(id: string): Promise<GoalRow | null> {
   return row ?? null;
 }
 
+import { createGuardedGoal } from "../services/monetization/entitlementGuard";
+
 /**
- * Insert a new savings goal with integer cents.
+ * Creates a new savings goal guarded by user entitlements.
+ * Delegates to createGuardedGoal to enforce atomic count, entitlement checks, and insertion.
  */
 export async function createGoal(goal: CreateGoalInput): Promise<GoalRow> {
-  const db = await getDatabase();
-  const id = Crypto.randomUUID();
-  const now = new Date().toISOString();
-  const currentAmountCents = Math.round(goal.current_amount_cents ?? 0);
-  const targetAmountCents = Math.round(goal.target_amount_cents);
-  const status: GoalStatus = goal.status ?? "active";
-  const cardVariant: CardVariant = goal.card_variant ?? "card";
-
-  await db.runAsync(
-    `INSERT INTO goals (
-      id,
-      title,
-      target_amount_cents,
-      current_amount_cents,
-      target_date,
-      status,
-      priority_label,
-      category_tag,
-      icon_name,
-      icon_family,
-      card_variant,
-      created_at,
-      updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-    [
-      id,
-      goal.title.trim(),
-      targetAmountCents,
-      currentAmountCents,
-      goal.target_date ?? null,
-      status,
-      goal.priority_label ?? null,
-      goal.category_tag ?? null,
-      goal.icon_name ?? null,
-      goal.icon_family ?? null,
-      cardVariant,
-      now,
-      now,
-    ]
-  );
-
-  const createdGoal = await getGoalById(id);
-  if (!createdGoal) {
-    throw new Error(`Failed to retrieve newly created goal with id: ${id}`);
-  }
-  return createdGoal;
+  return createGuardedGoal(goal);
 }
+
+export { createGuardedGoal };
 
 /**
  * Update metadata and fields for a goal.

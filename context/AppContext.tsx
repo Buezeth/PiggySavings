@@ -18,12 +18,12 @@ import {
 import {
   getActiveGoals,
   getAllGoals,
-  createGoal as createGoalInRepo,
   updateGoal as updateGoalInRepo,
   applyGoalDelta as applyGoalDeltaInRepo,
   CreateGoalInput,
   UpdateGoalInput,
 } from "../repositories/goalRepo";
+import { createGuardedGoal } from "../services/monetization/entitlementGuard";
 import {
   getTransactions,
   getCashflowSummary,
@@ -67,7 +67,7 @@ interface AppContextType {
     note?: string
   ) => Promise<GoalRow>;
   unlockGoalSlot: () => Promise<void>;
-  setSupporterStatus: (isSupporter: boolean) => Promise<void>;
+  setSupporterStatus: (isSupporter: boolean, unlockedGoalSlots?: number) => Promise<void>;
 }
 
 const defaultEntitlements: UserEntitlementRow = {
@@ -178,11 +178,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Create a new savings goal.
+   * Create a new savings goal guarded by user entitlements.
    */
   const createGoal = useCallback(
     async (goalInput: CreateGoalInput): Promise<GoalRow> => {
-      const newGoal = await createGoalInRepo(goalInput);
+      const newGoal = await createGuardedGoal(goalInput);
       setGoals((prev) => [newGoal, ...prev]);
       return newGoal;
     },
@@ -238,12 +238,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
-   * Set user supporter status.
+   * Set user supporter status and optional unlocked goal slots.
    */
-  const setSupporterStatus = useCallback(async (isSupporter: boolean) => {
-    const updated = await setSupporterStatusInRepo(isSupporter);
-    setEntitlements(updated);
-  }, []);
+  const setSupporterStatus = useCallback(
+    async (isSupporter: boolean, unlockedGoalSlots?: number) => {
+      const updated = await setSupporterStatusInRepo(isSupporter, unlockedGoalSlots);
+      setEntitlements(updated);
+    },
+    []
+  );
 
   const value: AppContextType = {
     goals,
