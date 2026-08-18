@@ -1,71 +1,66 @@
 import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useApp } from "@/context/AppContext";
 
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
+  const { transactions, cashflowSummary } = useApp();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
 
-  const transactions = [
-    {
-      id: "1",
-      title: "Salary Income",
-      category: "Income",
-      amount: "+$2,500.00",
-      date: "Today, 09:30 AM",
-      isIncome: true,
-      goalAllocated: "Emergency Fund",
-    },
-    {
-      id: "2",
-      title: "Auto-Allocation to Dream Setup",
-      category: "Savings Goal",
-      amount: "-$300.00",
-      date: "Today, 09:31 AM",
-      isIncome: false,
-      goalAllocated: "Dream Studio Setup",
-    },
-    {
-      id: "3",
-      title: "Grocery Shopping",
-      category: "Food & Dining",
-      amount: "-$64.20",
-      date: "Yesterday",
-      isIncome: false,
-    },
-    {
-      id: "4",
-      title: "Freelance Project",
-      category: "Side Income",
-      amount: "+$450.00",
-      date: "Aug 11, 2026",
-      isIncome: true,
-      goalAllocated: "Japan Trip",
-    },
-  ];
+  const totalIncomeDollars = (cashflowSummary.totalIncomeCents / 100).toLocaleString(
+    undefined,
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+  );
 
-  const totalIncome = transactions
-    .filter((t) => t.isIncome)
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
+  const totalExpenseDollars = (cashflowSummary.totalExpenseCents / 100).toLocaleString(
+    undefined,
+    { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+  );
 
-  const totalExpense = transactions
-    .filter((t) => !t.isIncome)
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
+  // Filter transactions in memory or from repository
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((item) => {
+      const isIncome = item.type === "income";
+      const matchesSearch =
+        !searchQuery.trim() ||
+        (item.note && item.note.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.category_name &&
+          item.category_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const filteredTransactions = transactions.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "income" && item.isIncome) ||
-      (filterType === "expense" && !item.isIncome);
-    return matchesSearch && matchesFilter;
-  });
+      const matchesFilter =
+        filterType === "all" ||
+        (filterType === "income" && isIncome) ||
+        (filterType === "expense" && !isIncome);
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [transactions, searchQuery, filterType]);
+
+  // Format transaction date helper
+  const formatDateLabel = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      const diffMs = now.getTime() - d.getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      if (diffDays === 0) {
+        return `Today, ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
+      if (diffDays === 1) {
+        return `Yesterday, ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
+      return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
@@ -89,7 +84,7 @@ export default function ActivityScreen() {
               </View>
             </View>
             <Text className="text-emerald text-base font-black">
-              +${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              +${totalIncomeDollars}
             </Text>
           </CartoonCard>
 
@@ -103,7 +98,7 @@ export default function ActivityScreen() {
               </View>
             </View>
             <Text className="text-rose text-base font-black">
-              -${Math.abs(totalExpense).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              -${totalExpenseDollars}
             </Text>
           </CartoonCard>
         </View>
@@ -129,7 +124,8 @@ export default function ActivityScreen() {
         <View className="flex-row gap-2 mb-3">
           {(["all", "income", "expense"] as const).map((type) => {
             const isSelected = filterType === type;
-            const label = type === "all" ? "All Activity" : type === "income" ? "Income (+" : "Expense (-";
+            const label =
+              type === "all" ? "All Activity" : type === "income" ? "Income (+" : "Expense (-";
 
             let chipClasses = "px-3.5 py-1.5 rounded-full border-2";
             if (isSelected) {
@@ -183,7 +179,12 @@ export default function ActivityScreen() {
           </CartoonCard>
         ) : (
           filteredTransactions.map((item) => {
-            const variant = item.isIncome ? "income" : "expense";
+            const isIncome = item.type === "income";
+            const variant = isIncome ? "income" : "expense";
+            const amountDollars = (item.amount_cents / 100).toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            });
 
             return (
               <CartoonCard
@@ -194,38 +195,31 @@ export default function ActivityScreen() {
                 <View className="flex-row items-center flex-1 pr-2">
                   <View
                     className={`will-change-variable w-11 h-11 rounded-2xl items-center justify-center mr-3 ${
-                      item.isIncome ? "bg-emerald" : "bg-rose"
+                      isIncome ? "bg-emerald" : "bg-rose"
                     }`}
                   >
                     <Ionicons
-                      name={item.isIncome ? "arrow-down" : "arrow-up"}
+                      name={isIncome ? "arrow-down" : "arrow-up"}
                       size={20}
                       color={colors.white}
                     />
                   </View>
                   <View className="flex-1">
                     <Text className="text-text-main text-sm font-black">
-                      {item.title}
+                      {item.note || item.category_name || (isIncome ? "Income" : "Expense")}
                     </Text>
                     <Text className="text-text-muted text-xs font-bold mt-0.5">
-                      {item.category} • {item.date}
+                      {item.category_name || "General"} • {formatDateLabel(item.transaction_date)}
                     </Text>
-                    {item.goalAllocated && (
-                      <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-lg mt-1.5 border border-border-card">
-                        <Text className="text-text-main text-[10px] font-black">
-                          🎯 {item.goalAllocated}
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 </View>
 
                 <Text
                   className={`will-change-variable text-base font-black ${
-                    item.isIncome ? "text-emerald" : "text-rose"
+                    isIncome ? "text-emerald" : "text-rose"
                   }`}
                 >
-                  {item.amount}
+                  {isIncome ? `+$${amountDollars}` : `-$${amountDollars}`}
                 </Text>
               </CartoonCard>
             );
@@ -235,4 +229,5 @@ export default function ActivityScreen() {
     </View>
   );
 }
+
 

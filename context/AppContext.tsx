@@ -39,6 +39,14 @@ import {
   unlockGoalSlot as unlockGoalSlotInRepo,
   setSupporterStatus as setSupporterStatusInRepo,
 } from "../repositories/entitlementRepo";
+import {
+  getRecurringSchedules,
+  toggleRecurringSchedule as toggleRecurringScheduleInRepo,
+  deleteRecurringSchedule as deleteRecurringScheduleInRepo,
+  createRecurringSchedule as createRecurringScheduleInRepo,
+  CreateRecurringScheduleInput,
+} from "../repositories/recurringRepo";
+import { RecurringScheduleRow } from "../services/db/types";
 
 interface AppContextType {
   // Reactive States
@@ -47,6 +55,7 @@ interface AppContextType {
   cashflowSummary: CashflowSummary;
   entitlements: UserEntitlementRow;
   categories: CategoryRow[];
+  recurringSchedules: RecurringScheduleRow[];
   isLoading: boolean;
   isReady: boolean;
   error: string | null;
@@ -68,6 +77,9 @@ interface AppContextType {
   ) => Promise<GoalRow>;
   unlockGoalSlot: () => Promise<void>;
   setSupporterStatus: (isSupporter: boolean, unlockedGoalSlots?: number) => Promise<void>;
+  toggleRecurring: (id: string, isActive?: boolean) => Promise<void>;
+  deleteRecurring: (id: string) => Promise<void>;
+  createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
 }
 
 const defaultEntitlements: UserEntitlementRow = {
@@ -94,6 +106,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [entitlements, setEntitlements] =
     useState<UserEntitlementRow>(defaultEntitlements);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [recurringSchedules, setRecurringSchedules] = useState<RecurringScheduleRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -118,12 +131,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchedCashflow,
         fetchedEntitlements,
         fetchedCategories,
+        fetchedRecurring,
       ] = await Promise.all([
         getActiveGoals(),
         getTransactions({ limit: 50 }),
         getCashflowSummary(),
         getUserEntitlements(),
         getAllCategories(),
+        getRecurringSchedules(),
       ]);
 
       // Only update state if this is still the most recent refresh invocation
@@ -133,6 +148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCashflowSummary(fetchedCashflow);
         setEntitlements(fetchedEntitlements);
         setCategories(fetchedCategories);
+        setRecurringSchedules(fetchedRecurring);
         setIsReady(true);
       }
     } catch (err) {
@@ -248,12 +264,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  /**
+   * Toggle a recurring schedule active/inactive.
+   */
+  const toggleRecurring = useCallback(
+    async (id: string, isActive?: boolean) => {
+      const updated = await toggleRecurringScheduleInRepo(id, isActive);
+      if (updated) {
+        setRecurringSchedules((prev) =>
+          prev.map((s) => (s.id === id ? updated : s))
+        );
+      }
+    },
+    []
+  );
+
+  /**
+   * Delete a recurring schedule.
+   */
+  const deleteRecurring = useCallback(async (id: string) => {
+    await deleteRecurringScheduleInRepo(id);
+    setRecurringSchedules((prev) => prev.filter((s) => s.id !== id));
+  }, []);
+
+  /**
+   * Create a new recurring schedule.
+   */
+  const createRecurringSchedule = useCallback(
+    async (input: CreateRecurringScheduleInput) => {
+      const created = await createRecurringScheduleInRepo(input);
+      setRecurringSchedules((prev) => [...prev, created]);
+      return created;
+    },
+    []
+  );
+
   const value: AppContextType = {
     goals,
     transactions,
     cashflowSummary,
     entitlements,
     categories,
+    recurringSchedules,
     isLoading,
     isReady,
     error,
@@ -265,6 +317,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     contributeToGoal,
     unlockGoalSlot,
     setSupporterStatus,
+    toggleRecurring,
+    deleteRecurring,
+    createRecurringSchedule,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
