@@ -252,7 +252,7 @@ export default function ProfileScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1 mr-2">
               <View
-                className={`w-11 h-11 rounded-2xl ${isSupporter ? "bg-gold" : "bg-primary"
+                className={`will-change-variable w-11 h-11 rounded-2xl ${isSupporter ? "bg-gold" : "bg-primary"
                   } items-center justify-center mr-3`}
               >
                 <MaterialCommunityIcons
@@ -305,7 +305,7 @@ export default function ProfileScreen() {
                 >
                   <View className="flex-row items-center flex-1 mr-2">
                     <View
-                      className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${isIncome ? "bg-emerald-subtle" : "bg-rose-subtle"
+                      className={`will-change-variable w-10 h-10 rounded-2xl items-center justify-center mr-3 ${isIncome ? "bg-emerald-subtle" : "bg-rose-subtle"
                         }`}
                     >
                       <Ionicons

@@ -15,17 +15,42 @@ export default function InsightsScreen() {
 
   React.useEffect(() => {
     let isMounted = true;
-    // Fetch last 180 days of transactions for comprehensive streak and velocity accuracy
+    // Fetch last 180 days of transactions for comprehensive streak and velocity accuracy with full pagination
     const startDate = new Date(Date.now() - 180 * 86400000).toISOString();
-    fetchTransactions({ startDate, limit: 1000 })
-      .then((rows) => {
-        if (isMounted) {
-          setHistoryTransactions(rows);
+    const pageSize = 500;
+
+    async function loadAllInsightsTransactions() {
+      try {
+        const accumulated: typeof transactions = [];
+        let offset = 0;
+        let hasMore = true;
+
+        while (hasMore) {
+          const page = await fetchTransactions({
+            startDate,
+            limit: pageSize,
+            offset,
+          });
+
+          if (!isMounted) return;
+          accumulated.push(...page);
+
+          if (page.length < pageSize) {
+            hasMore = false;
+          } else {
+            offset += pageSize;
+          }
         }
-      })
-      .catch((err) => {
+
+        if (isMounted) {
+          setHistoryTransactions(accumulated);
+        }
+      } catch (err) {
         console.error("Failed to fetch transactions for insights:", err);
-      });
+      }
+    }
+
+    loadAllInsightsTransactions();
 
     return () => {
       isMounted = false;
@@ -71,9 +96,18 @@ export default function InsightsScreen() {
       return `${d.getUTCFullYear()}-W${weekNo}`;
     };
 
+    const parseLocalDate = (dateStr: string): Date => {
+      // If YYYY-MM-DD date-only format, construct local calendar date to avoid timezone day shifts
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [y, m, d] = dateStr.split("-").map(Number);
+        return new Date(y, m - 1, d);
+      }
+      return new Date(dateStr);
+    };
+
     const activeWeeks = new Set<string>();
     for (const t of historyTransactions) {
-      const d = new Date(t.transaction_date);
+      const d = parseLocalDate(t.transaction_date);
       if (!isNaN(d.getTime())) {
         activeWeeks.add(getWeekKey(d));
       }
@@ -304,9 +338,15 @@ export default function InsightsScreen() {
             <Text className="text-gold-dark text-2xl font-black">
               {savingsStreakWeeks} Wks
             </Text>
-            <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-md mt-2 border border-gold-border">
-              <Text className="text-gold-dark text-[10px] font-black">
-                Active Saver 🔥
+            <View className={`self-start px-2 py-0.5 rounded-md mt-2 border ${
+              savingsStreakWeeks > 0
+                ? "bg-white-overlay-80 border-gold-border"
+                : "bg-bg-app border-border-card"
+            }`}>
+              <Text className={`text-[10px] font-black ${
+                savingsStreakWeeks > 0 ? "text-gold-dark" : "text-text-muted"
+              }`}>
+                {savingsStreakWeeks > 0 ? "Active Saver 🔥" : "No Active Streak"}
               </Text>
             </View>
           </CartoonCard>

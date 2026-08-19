@@ -22,7 +22,7 @@ export interface GoalAllocationInput {
   goal_id: string;
   amount_cents: number;
   note?: string | null;
-  idempotency_key?: string;
+  idempotency_key: string;
 }
 
 export interface TransactionFilterOptions {
@@ -105,7 +105,7 @@ export async function insertTransaction(
     // 2. If goal allocation specified, update goal balance and insert contribution
     if (goalAllocation && goalAllocation.amount_cents > 0) {
       const roundedGoalCents = Math.round(goalAllocation.amount_cents);
-      const contributionId = goalAllocation.idempotency_key ?? Crypto.randomUUID();
+      const contributionId = goalAllocation.idempotency_key;
 
       const updateResult = await txn.runAsync(
         `UPDATE goals

@@ -185,7 +185,7 @@ export default function AddTransactionModal() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingBottom: Math.max(insets.bottom, 16) + (isNoteFocused ? 280 : 32),
           }}
         >
           {/* Income vs Expense Tactile Segmented Switch */}
@@ -233,7 +233,7 @@ export default function AddTransactionModal() {
             </Text>
             <View className="flex-row items-center justify-center">
               <Text
-                className={`text-3xl font-black mr-1 ${type === "income" ? "text-emerald" : "text-rose"
+                className={`will-change-variable text-3xl font-black mr-1 ${type === "income" ? "text-emerald" : "text-rose"
                   }`}
               >
                 {type === "income" ? `+${currencySymbol.trim()}` : `-${currencySymbol.trim()}`}
@@ -245,7 +245,7 @@ export default function AddTransactionModal() {
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className={`text-4xl font-black flex-1 ${type === "income" ? "text-emerald" : "text-rose"
+                className={`will-change-variable text-4xl font-black flex-1 ${type === "income" ? "text-emerald" : "text-rose"
                   }`}
               />
             </View>
@@ -276,7 +276,7 @@ export default function AddTransactionModal() {
                     }`}
                 >
                   <Text
-                    className={`text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                    className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
                       }`}
                   >
                     {c.name}
@@ -302,7 +302,7 @@ export default function AddTransactionModal() {
                     }`}
                 >
                   <Text
-                    className={`text-xs font-black ${selectedGoalId === null ? "text-primary" : "text-text-muted"
+                    className={`will-change-variable text-xs font-black ${selectedGoalId === null ? "text-primary" : "text-text-muted"
                       }`}
                   >
                     None
@@ -322,7 +322,7 @@ export default function AddTransactionModal() {
                         }`}
                     >
                       <Text
-                        className={`text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                        className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
                           }`}
                       >
                         🎯 {g.title}
@@ -399,13 +399,13 @@ export default function AddTransactionModal() {
                     <TouchableOpacity
                       key={item.id}
                       onPress={() => setFrequency(item.id)}
-                      className={`px-3 py-1.5 rounded-full border ${frequency === item.id
+                      className={`will-change-variable px-3 py-1.5 rounded-full border ${frequency === item.id
                         ? "bg-primary border-primary-dark"
                         : "bg-bg-app border-border-card"
                         }`}
                     >
                       <Text
-                        className={`text-xs font-black ${frequency === item.id ? "text-white" : "text-text-muted"
+                        className={`will-change-variable text-xs font-black ${frequency === item.id ? "text-white" : "text-text-muted"
                           }`}
                       >
                         {item.label}

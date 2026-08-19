@@ -46,7 +46,7 @@ const CurrencyListItem = React.memo(({ currency, isSelected, onSelect }: Currenc
       activeOpacity={0.8}
       onPress={() => onSelect(currency.code)}
       style={{ height: 64 }}
-      className={`flex-row items-center justify-between px-3.5 rounded-2xl mb-2.5 border-2 ${
+      className={`will-change-variable flex-row items-center justify-between px-3.5 rounded-2xl mb-2.5 border-2 ${
         isSelected
           ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
           : "bg-bg-app border-border-card border-b-4 border-b-border-card-dark"
@@ -54,12 +54,12 @@ const CurrencyListItem = React.memo(({ currency, isSelected, onSelect }: Currenc
     >
       <View className="flex-row items-center flex-1 mr-3">
         <View
-          className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${
+          className={`will-change-variable w-10 h-10 rounded-2xl items-center justify-center mr-3 ${
             isSelected ? "bg-primary" : "bg-bg-card"
           }`}
         >
           <Text
-            className={`text-sm font-black ${
+            className={`will-change-variable text-sm font-black ${
               isSelected ? "text-white" : "text-text-main"
             }`}
             numberOfLines={1}
