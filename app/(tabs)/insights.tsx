@@ -8,7 +8,29 @@ import { useApp } from "@/context/AppContext";
 
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
-  const { goals, transactions, cashflowSummary, getGoalContributions, formatMoney } = useApp();
+  const { goals, transactions, cashflowSummary, getGoalContributions, fetchTransactions, formatMoney } = useApp();
+
+  // Metrics Transaction History (Complete date-bounded window, not limited to 50 items)
+  const [historyTransactions, setHistoryTransactions] = React.useState(transactions);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    // Fetch last 180 days of transactions for comprehensive streak and velocity accuracy
+    const startDate = new Date(Date.now() - 180 * 86400000).toISOString();
+    fetchTransactions({ startDate, limit: 1000 })
+      .then((rows) => {
+        if (isMounted) {
+          setHistoryTransactions(rows);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch transactions for insights:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchTransactions, transactions]);
 
   // 1. Savings Rate Calculation
   const savingsRatePercent = useMemo(() => {
@@ -21,23 +43,23 @@ export default function InsightsScreen() {
   // 2. Velocity Calculation (Past 30 Days)
   const past30DaysVelocityCents = useMemo(() => {
     const cutoffDate = new Date(Date.now() - 30 * 86400000);
-    const incomeCents = transactions
+    const incomeCents = historyTransactions
       .filter(
         (t) => t.type === "income" && new Date(t.transaction_date) >= cutoffDate
       )
       .reduce((sum, t) => sum + t.amount_cents, 0);
-    const expenseCents = transactions
+    const expenseCents = historyTransactions
       .filter(
         (t) => t.type === "expense" && new Date(t.transaction_date) >= cutoffDate
       )
       .reduce((sum, t) => sum + t.amount_cents, 0);
 
     return incomeCents - expenseCents;
-  }, [transactions]);
+  }, [historyTransactions]);
 
   // 3. Weekly Streak Calculation (Consecutive active weeks counting backward from current week)
   const savingsStreakWeeks = useMemo(() => {
-    if (transactions.length === 0) return 0;
+    if (historyTransactions.length === 0) return 0;
 
     const getWeekKey = (date: Date): string => {
       // Normalize to Monday-based ISO week
@@ -50,7 +72,7 @@ export default function InsightsScreen() {
     };
 
     const activeWeeks = new Set<string>();
-    for (const t of transactions) {
+    for (const t of historyTransactions) {
       const d = new Date(t.transaction_date);
       if (!isNaN(d.getTime())) {
         activeWeeks.add(getWeekKey(d));
@@ -67,7 +89,7 @@ export default function InsightsScreen() {
     }
 
     return streak;
-  }, [transactions]);
+  }, [historyTransactions]);
 
   // 4. Primary Goal Projected Completion Date
   const [primaryGoalContributions30DCents, setPrimaryGoalContributions30DCents] =

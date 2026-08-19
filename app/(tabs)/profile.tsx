@@ -34,6 +34,7 @@ export default function ProfileScreen() {
   const [isTipJarVisible, setIsTipJarVisible] = useState(false);
   const [isCurrencyPickerVisible, setIsCurrencyPickerVisible] = useState(false);
   const isSettingCurrencyRef = useRef(false);
+  const isMutatingRecurringRef = useRef(false);
 
   const handleSelectCurrency = async (code: string) => {
     if (isSettingCurrencyRef.current) return;
@@ -47,6 +48,46 @@ export default function ProfileScreen() {
       isSettingCurrencyRef.current = false;
       setIsCurrencyPickerVisible(false);
     }
+  };
+
+  const handleToggleRecurring = async (id: string, currentActive: boolean) => {
+    if (isMutatingRecurringRef.current) return;
+    isMutatingRecurringRef.current = true;
+    try {
+      await toggleRecurring(id, !currentActive);
+    } catch (err) {
+      console.error("Failed to toggle recurring schedule:", err);
+      Alert.alert("Error", "Could not update recurring schedule.");
+    } finally {
+      isMutatingRecurringRef.current = false;
+    }
+  };
+
+  const handleDeleteRecurring = (id: string, title: string) => {
+    if (isMutatingRecurringRef.current) return;
+    Alert.alert(
+      "Delete Recurring Schedule",
+      `Are you sure you want to delete "${title}"? This action cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            if (isMutatingRecurringRef.current) return;
+            isMutatingRecurringRef.current = true;
+            try {
+              await deleteRecurring(id);
+            } catch (err) {
+              console.error("Failed to delete recurring schedule:", err);
+              Alert.alert("Error", "Could not delete recurring schedule.");
+            } finally {
+              isMutatingRecurringRef.current = false;
+            }
+          },
+        },
+      ]
+    );
   };
 
   useEffect(() => {
@@ -286,12 +327,12 @@ export default function ProfileScreen() {
                   <View className="flex-row items-center gap-2">
                     <Switch
                       value={schedule.is_active === 1}
-                      onValueChange={() => toggleRecurring(schedule.id)}
+                      onValueChange={() => handleToggleRecurring(schedule.id, schedule.is_active === 1)}
                       trackColor={{ false: colors.mutedTrack, true: colors.primary }}
                       thumbColor={colors.white}
                     />
                     <TouchableOpacity
-                      onPress={() => deleteRecurring(schedule.id)}
+                      onPress={() => handleDeleteRecurring(schedule.id, schedule.title)}
                       className="p-1"
                     >
                       <Ionicons name="trash-outline" size={18} color={colors.textMuted} />

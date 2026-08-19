@@ -128,6 +128,7 @@ export default function AddTransactionModal() {
             goal_id: selectedGoalId,
             amount_cents: amountInCents,
             note: note.trim() || "Auto-allocated from quick transaction",
+            idempotency_key: generateUUIDv4(),
           }
           : undefined,
         isRecurring
@@ -184,7 +185,7 @@ export default function AddTransactionModal() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
-            paddingBottom: Math.max(insets.bottom, 16) + (isNoteFocused ? 280 : 32),
+            paddingBottom: Math.max(insets.bottom, 16),
           }}
         >
           {/* Income vs Expense Tactile Segmented Switch */}

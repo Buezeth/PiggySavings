@@ -113,13 +113,17 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
     );
   }, [searchQuery]);
 
+  const handleClose = useCallback(() => {
+    setSearchQuery("");
+    onClose();
+  }, [onClose]);
+
   const handleSelect = useCallback(
     (code: string) => {
       onSelectCurrency(code);
-      setSearchQuery("");
-      onClose();
+      handleClose();
     },
-    [onSelectCurrency, onClose]
+    [onSelectCurrency, handleClose]
   );
 
   const renderItem = useCallback(
@@ -154,14 +158,14 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
         <Pressable
-          onPress={onClose}
+          onPress={handleClose}
           className="flex-1 bg-black-overlay-60 justify-end"
         >
           <Pressable
@@ -183,7 +187,7 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={onClose}
+                  onPress={handleClose}
                   className="w-9 h-9 rounded-full bg-bg-app items-center justify-center border border-border-card"
                 >
                   <Ionicons name="close" size={18} color={colors.textMain} />
