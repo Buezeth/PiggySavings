@@ -99,11 +99,17 @@ export default function AddTransactionModal() {
 
     const amountInCents = parsedResult.cents;
 
-    if (!selectedCategoryId) {
+    const categoryId = matchingCategories.some(
+      (category) => category.id === selectedCategoryId
+    )
+      ? selectedCategoryId
+      : null;
+
+    if (!categoryId) {
       Alert.alert("Category Required", "Select a category before you save this transaction.");
       return;
     }
-    const categoryId = selectedCategoryId;
+
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
     const transactionDate = new Date().toISOString();
