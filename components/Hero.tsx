@@ -213,7 +213,13 @@ export const Hero: React.FC<HeroProps> = ({
         {data.scoreTrend && (
           <View className="bg-white-overlay-20 px-3.5 py-1 rounded-full flex-row items-center mt-2.5 border border-white-overlay-10">
             <Ionicons
-              name={data.scoreTrend.direction === "up" ? "arrow-up" : "arrow-down"}
+              name={
+                data.scoreTrend.direction === "up"
+                  ? "arrow-up"
+                  : data.scoreTrend.direction === "down"
+                  ? "arrow-down"
+                  : "remove"
+              }
               size={12}
               color={colors.white}
             />
@@ -231,7 +237,35 @@ export const Hero: React.FC<HeroProps> = ({
       >
         {data.metrics.map((metric, index) => {
           const isLast = index === data.metrics.length - 1;
-          const isPositive = metric.trendDirection === "up";
+          const direction = metric.trendDirection;
+
+          const pillBgBorder =
+            direction === "up"
+              ? "bg-emerald-subtle border-emerald-border"
+              : direction === "down"
+              ? "bg-rose-subtle border-rose-border"
+              : "bg-bg-app border-border-card";
+
+          const iconName: keyof typeof Ionicons.glyphMap =
+            direction === "up"
+              ? "arrow-up"
+              : direction === "down"
+              ? "arrow-down"
+              : "remove";
+
+          const iconColor =
+            direction === "up"
+              ? colors.emeraldDark
+              : direction === "down"
+              ? colors.roseDark
+              : colors.textMuted;
+
+          const textColor =
+            direction === "up"
+              ? "text-emerald-dark"
+              : direction === "down"
+              ? "text-rose-dark"
+              : "text-text-muted";
 
           return (
             <React.Fragment key={metric.id}>
@@ -243,19 +277,15 @@ export const Hero: React.FC<HeroProps> = ({
                   {metric.value}
                 </Text>
                 <View
-                  className={`flex-row items-center px-1.5 py-0.5 rounded-md border ${isPositive
-                    ? "bg-emerald-subtle border-emerald-border"
-                    : "bg-rose-subtle border-rose-border"
-                    }`}
+                  className={`flex-row items-center px-1.5 py-0.5 rounded-md border ${pillBgBorder}`}
                 >
                   <Ionicons
-                    name={isPositive ? "arrow-up" : "arrow-down"}
+                    name={iconName}
                     size={11}
-                    color={isPositive ? colors.emeraldDark : colors.roseDark}
+                    color={iconColor}
                   />
                   <Text
-                    className={`text-[10px] font-black ml-0.5 ${isPositive ? "text-emerald-dark" : "text-rose-dark"
-                      }`}
+                    className={`text-[10px] font-black ml-0.5 ${textColor}`}
                   >
                     {metric.change}
                   </Text>

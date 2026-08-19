@@ -2,7 +2,7 @@ import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "@/context/AppContext";
 import { RecurringFrequency } from "@/services/db/types";
+
+import { parseCurrencyToCents, getCurrency } from "@/constants/currencies";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -33,7 +35,7 @@ const generateUUIDv4 = (): string => {
 export default function AddTransactionModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { goals, categories, addTransaction, createRecurringSchedule } = useApp();
+  const { goals, categories, currencyCode, currencySymbol, addTransaction, createRecurringSchedule } = useApp();
 
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
@@ -44,7 +46,10 @@ export default function AddTransactionModal() {
   // Recurring Schedule State
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
+  const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
 
   // Filter categories matching current type
   const matchingCategories = useMemo(() => {
@@ -61,31 +66,33 @@ export default function AddTransactionModal() {
   }, [matchingCategories]);
 
   const handleSave = async () => {
-    const trimmedAmount = amount.trim();
-    if (!/^\d+(\.\d{1,2})?$/.test(trimmedAmount)) {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const parsedResult = parseCurrencyToCents(amount, currencyCode);
+    if (!parsedResult) {
       Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
       return;
     }
 
-    const [integerPart, fractionalPart = ""] = trimmedAmount.split(".");
-    const normalizedFraction = (fractionalPart + "00").slice(0, 2);
-    const amountInCents =
-      parseInt(integerPart, 10) * 100 + parseInt(normalizedFraction, 10);
-
-    if (!Number.isSafeInteger(amountInCents) || amountInCents <= 0) {
-      Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
+    if (parsedResult.error) {
+      Alert.alert("Invalid Amount", parsedResult.error);
       return;
     }
+
+    const amountInCents = parsedResult.cents;
 
     const categoryId = selectedCategoryId || (type === "income" ? "cat_salary" : "cat_dining");
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
     const transactionDate = new Date().toISOString();
 
-    try {
-      setIsSubmitting(true);
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
-      // 1. Insert Transaction with optional goal contribution
+    try {
+      // Insert Transaction with optional goal contribution and recurring schedule atomically (ACID)
       await addTransaction(
         {
           id: transactionId,
@@ -102,26 +109,25 @@ export default function AddTransactionModal() {
               amount_cents: amountInCents,
               note: note.trim() || "Auto-allocated from quick transaction",
             }
+          : undefined,
+        isRecurring
+          ? {
+              category_id: categoryId,
+              title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
+              type,
+              amount_cents: amountInCents,
+              frequency,
+              start_date: transactionDate,
+            }
           : undefined
       );
-
-      // 2. If recurring option enabled, register a recurring schedule
-      if (isRecurring) {
-        await createRecurringSchedule({
-          category_id: categoryId,
-          title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
-          type,
-          amount_cents: amountInCents,
-          frequency,
-          start_date: transactionDate,
-        });
-      }
 
       router.back();
     } catch (err) {
       console.error("Failed to save transaction:", err);
       Alert.alert("Error", err instanceof Error ? err.message : "Failed to record transaction.");
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -207,12 +213,12 @@ export default function AddTransactionModal() {
                   type === "income" ? "text-emerald" : "text-rose"
                 }`}
               >
-                {type === "income" ? "+$" : "-$"}
+                {type === "income" ? `+${currencySymbol.trim()}` : `-${currencySymbol.trim()}`}
               </Text>
               <TextInput
                 value={amount}
                 onChangeText={setAmount}
-                placeholder="0.00"
+                placeholder={activeCurrency.decimal_digits === 0 ? "0" : "0.00"}
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
@@ -221,6 +227,13 @@ export default function AddTransactionModal() {
                 }`}
               />
             </View>
+            {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+              <Text className="text-text-muted text-[11px] font-bold mt-1">
+                {activeCurrency.rounding > 0
+                  ? `Rounds to nearest ${activeCurrency.rounding} step`
+                  : "Zero-decimal currency"}
+              </Text>
+            )}
           </CartoonCard>
 
           {/* Category Selector */}

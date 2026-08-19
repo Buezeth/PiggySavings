@@ -1,13 +1,20 @@
 import CartoonCard from "@/components/CartoonCard";
+import { GoalLimitModal } from "@/components/GoalLimitModal";
 import Hero from "@/components/Hero";
+import { TipJarModal } from "@/components/TipJarModal";
 import { colors } from "@/constants/theme";
+import { parseCurrencyToCents, getCurrency } from "@/constants/currencies";
+import { useApp } from "@/context/AppContext";
 import { HeroData, TimePeriod } from "@/data/homeData";
+import { canCreateNewGoal } from "@/services/monetization/entitlementGuard";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   Text,
   TextInput,
@@ -15,15 +22,13 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "@/context/AppContext";
-import { canCreateNewGoal } from "@/services/monetization/entitlementGuard";
-import { GoalLimitModal } from "@/components/GoalLimitModal";
-import { TipJarModal } from "@/components/TipJarModal";
 
 export default function GoalsHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { goals, transactions, cashflowSummary, createGoal } = useApp();
+  const { goals, transactions, cashflowSummary, createGoal, currencyCode, currencySymbol, formatMoney } = useApp();
+
+  const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
 
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("30D");
   const [isGoalLimitModalVisible, setIsGoalLimitModalVisible] = useState(false);
@@ -54,14 +59,7 @@ export default function GoalsHomeScreen() {
 
     // Format currency helpers
     const formatCents = (cents: number): string => {
-      const dollars = cents / 100;
-      if (dollars >= 1000) {
-        return `$${(dollars / 1000).toFixed(1)}K`;
-      }
-      return `$${dollars.toLocaleString(undefined, {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-      })}`;
+      return formatMoney(cents, { compact: true });
     };
 
     // 2. Velocity calculation based on transactions in selected period
@@ -82,10 +80,8 @@ export default function GoalsHomeScreen() {
       )
       .reduce((sum, t) => sum + t.amount_cents, 0);
 
-    const periodNetSavingsCents = Math.max(
-      0,
-      periodIncomeCents - periodExpenseCents
-    );
+    const rawPeriodNetSavingsCents = periodIncomeCents - periodExpenseCents;
+    const periodNetSavingsCents = Math.max(0, rawPeriodNetSavingsCents);
 
     // 3. Health Score calculation (0-100)
     let healthScore = 75; // Baseline healthy score
@@ -107,14 +103,51 @@ export default function GoalsHomeScreen() {
         ? Math.round((totalSavedCents / totalTargetCents) * 100)
         : 0;
 
+    let scoreTrendText = "Healthy savings pace";
+    let scoreTrendDirection: "up" | "down" | "neutral" = "up";
+    if (healthScore >= 80) {
+      scoreTrendText = "Excellent savings pace";
+      scoreTrendDirection = "up";
+    } else if (healthScore >= 65) {
+      scoreTrendText = "Moderate savings pace";
+      scoreTrendDirection = "neutral";
+    } else {
+      scoreTrendText = "Savings pace needs attention";
+      scoreTrendDirection = "down";
+    }
+
+    const totalSavedTrend: "up" | "down" | "neutral" =
+      totalSavedCents > 0 ? "up" : "neutral";
+
+    const targetGoalTrend: "up" | "down" | "neutral" =
+      targetProgressPercent >= 50
+        ? "up"
+        : targetProgressPercent > 0
+          ? "neutral"
+          : "down";
+
+    const velocityTrend: "up" | "down" | "neutral" =
+      rawPeriodNetSavingsCents > 0
+        ? "up"
+        : rawPeriodNetSavingsCents === 0
+          ? "neutral"
+          : "down";
+
+    const velocityPrefix =
+      rawPeriodNetSavingsCents > 0
+        ? "+"
+        : rawPeriodNetSavingsCents < 0
+          ? "-"
+          : "";
+
     return {
       title: "Savings Report",
       subtitle: "piggysavings.app",
       healthScore,
       maxHealthScore: 100,
       scoreTrend: {
-        text: "Healthy savings pace",
-        direction: "up",
+        text: scoreTrendText,
+        direction: scoreTrendDirection,
       },
       metrics: [
         {
@@ -122,27 +155,27 @@ export default function GoalsHomeScreen() {
           label: "Total Saved",
           value: formatCents(totalSavedCents),
           change: `${goals.length} Active`,
-          trendDirection: "up",
+          trendDirection: totalSavedTrend,
         },
         {
           id: "target_goal",
           label: "Target Goal",
           value: formatCents(totalTargetCents),
           change: `${targetProgressPercent}%`,
-          trendDirection: "up",
+          trendDirection: targetGoalTrend,
         },
         {
           id: "velocity",
           label: "Velocity",
-          value: `+$${Math.round(periodNetSavingsCents / 100).toLocaleString()}`,
+          value: `${velocityPrefix}${formatMoney(Math.abs(rawPeriodNetSavingsCents), { compact: true })}`,
           change: selectedPeriod,
-          trendDirection: "up",
+          trendDirection: velocityTrend,
         },
       ],
     };
-  }, [goals, transactions, cashflowSummary, selectedPeriod]);
+  }, [goals, transactions, cashflowSummary, selectedPeriod, formatMoney]);
 
-  // Featured Goal Selection: Pick goal with highest completion or first active goal
+  // Featured Goal Selection: Returns the first goal when available
   const featuredGoal = useMemo(() => {
     if (goals.length === 0) return null;
     return goals[0];
@@ -150,13 +183,13 @@ export default function GoalsHomeScreen() {
 
   const featuredProgressPercent = featuredGoal
     ? Math.min(
-        Math.round(
-          ((featuredGoal.current_amount_cents || 0) /
-            (featuredGoal.target_amount_cents || 1)) *
-            100
-        ),
+      Math.round(
+        ((featuredGoal.current_amount_cents || 0) /
+          (featuredGoal.target_amount_cents || 1)) *
         100
-      )
+      ),
+      100
+    )
     : 0;
 
   // Handler for adding a new goal with limit guard
@@ -181,20 +214,26 @@ export default function GoalsHomeScreen() {
   // Submit new goal
   const handleSaveGoal = async () => {
     const trimmedTitle = newGoalTitle.trim();
-    const parsedTarget = parseFloat(newGoalTarget);
 
     if (!trimmedTitle) {
       Alert.alert("Goal Title Required", "Please enter a name for your savings goal.");
       return;
     }
-    if (isNaN(parsedTarget) || parsedTarget <= 0) {
+
+    const parsedResult = parseCurrencyToCents(newGoalTarget, currencyCode);
+    if (!parsedResult) {
       Alert.alert("Invalid Target", "Please enter a valid positive target amount.");
+      return;
+    }
+
+    if (parsedResult.error) {
+      Alert.alert("Invalid Target", parsedResult.error);
       return;
     }
 
     try {
       setIsSubmittingGoal(true);
-      const targetCents = Math.round(parsedTarget * 100);
+      const targetCents = parsedResult.cents;
       await createGoal({
         title: trimmedTitle,
         target_amount_cents: targetCents,
@@ -243,7 +282,7 @@ export default function GoalsHomeScreen() {
             >
               <Ionicons name="add-circle" size={14} color={colors.primary} />
               <Text className="text-primary text-xs font-black ml-1">
-                + Add Goal
+                Add Goal
               </Text>
             </TouchableOpacity>
           </View>
@@ -296,13 +335,9 @@ export default function GoalsHomeScreen() {
                 <View className="flex-row justify-between items-center mb-1.5">
                   <Text className="text-text-muted text-xs font-bold">Progress</Text>
                   <Text className="text-primary text-xs font-black">
-                    ${(featuredGoal.current_amount_cents / 100).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}{" "}
-                    / $
-                    {(featuredGoal.target_amount_cents / 100).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                    })}{" "}
+                    {formatMoney(featuredGoal.current_amount_cents)}{" "}
+                    /{" "}
+                    {formatMoney(featuredGoal.target_amount_cents)}{" "}
                     ({featuredProgressPercent}%)
                   </Text>
                 </View>
@@ -320,8 +355,8 @@ export default function GoalsHomeScreen() {
                   {featuredProgressPercent >= 100
                     ? "🏆 Goal completed! Congratulations on reaching this milestone!"
                     : featuredProgressPercent >= 75
-                    ? "🎉 Almost there! Keep up the great savings pace."
-                    : "💪 Every contribution brings you closer to your target!"}
+                      ? "🎉 Almost there! Keep up the great savings pace."
+                      : "💪 Every contribution brings you closer to your target!"}
                 </Text>
               </View>
             </CartoonCard>
@@ -356,7 +391,7 @@ export default function GoalsHomeScreen() {
           {goals.length === 0 ? (
             <CartoonCard className="p-5 mb-6 items-center">
               <Text className="text-text-muted text-xs font-bold">
-                Tap "+ Add Goal" above to create savings goals.
+                {'Tap "+ Add Goal" above to create savings goals.'}
               </Text>
             </CartoonCard>
           ) : (
@@ -366,7 +401,7 @@ export default function GoalsHomeScreen() {
                   Math.round(
                     ((goal.current_amount_cents || 0) /
                       (goal.target_amount_cents || 1)) *
-                      100
+                    100
                   ),
                   100
                 );
@@ -419,18 +454,10 @@ export default function GoalsHomeScreen() {
                       {goal.title}
                     </Text>
                     <Text className={`${amountTextClass} text-base font-black`}>
-                      ${(goal.current_amount_cents / 100).toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}
+                      {formatMoney(goal.current_amount_cents)}
                     </Text>
                     <Text className="text-text-muted text-[11px] font-bold mb-3">
-                      of $
-                      {(goal.target_amount_cents / 100).toLocaleString(undefined, {
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0,
-                      })}{" "}
-                      goal
+                      of {formatMoney(goal.target_amount_cents)} goal
                     </Text>
 
                     {/* Playful Progress Bar */}
@@ -490,6 +517,10 @@ export default function GoalsHomeScreen() {
       <TipJarModal
         visible={isTipJarModalVisible}
         onClose={() => setIsTipJarModalVisible(false)}
+        onSuccess={() => {
+          setIsTipJarModalVisible(false);
+          setIsAddGoalModalVisible(true);
+        }}
       />
 
       {/* ─── QUICK ADD GOAL DIALOG ─── */}
@@ -499,87 +530,101 @@ export default function GoalsHomeScreen() {
         transparent
         onRequestClose={() => setIsAddGoalModalVisible(false)}
       >
-        <View className="flex-1 bg-black-overlay-60 justify-end">
-          <View
-            style={{ paddingBottom: Math.max(insets.bottom, 20) }}
-            className="bg-bg-card rounded-t-3xl p-6 border-t-2 border-border-card"
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-text-main text-lg font-black">
-                Create Savings Goal 🎯
-              </Text>
-              <TouchableOpacity
-                onPress={() => setIsAddGoalModalVisible(false)}
-                className="w-8 h-8 rounded-full bg-bg-app items-center justify-center"
-              >
-                <Ionicons name="close" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-              Goal Name
-            </Text>
-            <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-3">
-              <TextInput
-                value={newGoalTitle}
-                onChangeText={setNewGoalTitle}
-                placeholder="e.g., Japan Vacation, Studio Setup"
-                placeholderTextColor={colors.textMuted}
-                className="text-sm text-text-main font-bold"
-              />
-            </View>
-
-            <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-              Target Amount ($)
-            </Text>
-            <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-3">
-              <TextInput
-                value={newGoalTarget}
-                onChangeText={setNewGoalTarget}
-                placeholder="1000.00"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="decimal-pad"
-                className="text-sm text-text-main font-bold"
-              />
-            </View>
-
-            <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-              Category Tag
-            </Text>
-            <View className="flex-row gap-2 mb-6">
-              {["Savings", "Travel", "Tech", "Emergency"].map((cat) => (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          className="flex-1"
+        >
+          <View className="flex-1 bg-black-overlay-60 justify-end">
+            <CartoonCard
+              variant="card"
+              style={{ paddingBottom: Math.max(insets.bottom, 20) }}
+              className="rounded-t-3xl rounded-b-none p-6"
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-text-main text-lg font-black">
+                  Create Savings Goal 🎯
+                </Text>
                 <TouchableOpacity
-                  key={cat}
-                  onPress={() => setNewGoalCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full border ${
-                    newGoalCategory === cat
+                  onPress={() => setIsAddGoalModalVisible(false)}
+                  className="w-8 h-8 rounded-full bg-bg-app items-center justify-center"
+                >
+                  <Ionicons name="close" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+
+              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
+                Goal Name
+              </Text>
+              <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-3">
+                <TextInput
+                  value={newGoalTitle}
+                  onChangeText={setNewGoalTitle}
+                  placeholder="e.g., Japan Vacation, Studio Setup"
+                  placeholderTextColor={colors.textMuted}
+                  className="text-sm text-text-main font-bold"
+                />
+              </View>
+
+              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
+                Target Amount ({currencySymbol.trim()})
+              </Text>
+              <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-1">
+                <TextInput
+                  value={newGoalTarget}
+                  onChangeText={setNewGoalTarget}
+                  placeholder={activeCurrency.decimal_digits === 0 ? "1000" : "1000.00"}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="decimal-pad"
+                  className="text-sm text-text-main font-bold"
+                />
+              </View>
+              {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+                <Text className="text-text-muted text-[11px] font-bold mb-3">
+                  {activeCurrency.rounding > 0
+                    ? `Target rounds to nearest ${activeCurrency.rounding} step`
+                    : "Zero-decimal currency"}
+                </Text>
+              )}
+              {!(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+                <View className="mb-3" />
+              )}
+
+              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
+                Category Tag
+              </Text>
+              <View className="flex-row gap-2 mb-6">
+                {["Savings", "Travel", "Tech", "Emergency"].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setNewGoalCategory(cat)}
+                    className={`px-3 py-1.5 rounded-full border ${newGoalCategory === cat
                       ? "bg-primary border-primary-dark"
                       : "bg-bg-app border-border-card"
-                  }`}
-                >
-                  <Text
-                    className={`text-xs font-black ${
-                      newGoalCategory === cat ? "text-white" : "text-text-muted"
-                    }`}
+                      }`}
                   >
-                    {cat}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    <Text
+                      className={`text-xs font-black ${newGoalCategory === cat ? "text-white" : "text-text-muted"
+                        }`}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <TouchableOpacity
-              onPress={handleSaveGoal}
-              disabled={isSubmittingGoal}
-              activeOpacity={0.85}
-              className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
-            >
-              <Text className="text-white text-sm font-black uppercase">
-                {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveGoal}
+                disabled={isSubmittingGoal}
+                activeOpacity={0.85}
+                className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
+              >
+                <Text className="text-white text-sm font-black uppercase">
+                  {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
+                </Text>
+              </TouchableOpacity>
+            </CartoonCard>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -1,5 +1,8 @@
 import CartoonCard from "@/components/CartoonCard";
+import { TipJarModal } from "@/components/TipJarModal";
+import { CurrencyPickerModal } from "@/components/CurrencyPickerModal";
 import { colors } from "@/constants/theme";
+import { useApp } from "@/context/AppContext";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
@@ -9,14 +12,16 @@ import {
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "@/context/AppContext";
-import { TipJarModal } from "@/components/TipJarModal";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const {
     entitlements,
     recurringSchedules,
+    currencyCode,
+    currencySymbol,
+    setPreferredCurrency,
+    formatMoney,
     toggleRecurring,
     deleteRecurring,
     refreshData,
@@ -27,6 +32,7 @@ export default function ProfileScreen() {
   const [isBiometricsAvailable, setIsBiometricsAvailable] = useState(false);
   const [isNotificationsAvailable, setIsNotificationsAvailable] = useState(false);
   const [isTipJarVisible, setIsTipJarVisible] = useState(false);
+  const [isCurrencyPickerVisible, setIsCurrencyPickerVisible] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -123,32 +129,16 @@ export default function ProfileScreen() {
   const handleBackupToGoogleDrive = () => {
     Alert.alert(
       "Google Drive AppData Backup",
-      "Backs up your local SQLite database securely into your private Google Drive appDataFolder with zero hosting dependencies.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Backup Now",
-          onPress: () => {
-            Alert.alert("Backup Success", "Database snapshot saved to Google Drive AppData.");
-          },
-        },
-      ]
+      "Google Drive cloud sync is currently unavailable in this build. Cloud synchronization with hidden appDataFolder will be enabled in an upcoming release.",
+      [{ text: "OK" }]
     );
   };
 
   const handleExportBackupFile = () => {
     Alert.alert(
       "Export .piggysave Backup",
-      "Export your encrypted local transactions and goal ledgers as a portable .piggysave file.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Export",
-          onPress: () => {
-            Alert.alert("Export Ready", "Your .piggysave backup bundle is ready to share.");
-          },
-        },
-      ]
+      "Encrypted .piggysave file export is currently unavailable in this build. Standalone backup bundles will be enabled in an upcoming release.",
+      [{ text: "OK" }]
     );
   };
 
@@ -206,9 +196,8 @@ export default function ProfileScreen() {
           <View className="flex-row items-center justify-between">
             <View className="flex-row items-center flex-1 mr-2">
               <View
-                className={`w-11 h-11 rounded-2xl ${
-                  isSupporter ? "bg-gold" : "bg-primary"
-                } items-center justify-center mr-3`}
+                className={`w-11 h-11 rounded-2xl ${isSupporter ? "bg-gold" : "bg-primary"
+                  } items-center justify-center mr-3`}
               >
                 <MaterialCommunityIcons
                   name={isSupporter ? "crown" : "heart"}
@@ -244,7 +233,7 @@ export default function ProfileScreen() {
           {recurringSchedules.length === 0 ? (
             <View className="py-2 items-center">
               <Text className="text-text-muted text-xs font-bold text-center">
-                No active recurring schedules found. Toggle "Schedule as Recurring" when logging a paycheck or expense!
+                No active recurring schedules found. Toggle &quot;Schedule as Recurring&quot; when logging a paycheck or expense!
               </Text>
             </View>
           ) : (
@@ -255,15 +244,13 @@ export default function ProfileScreen() {
               return (
                 <View
                   key={schedule.id}
-                  className={`flex-row items-center justify-between py-3 ${
-                    !isLast ? "border-b border-bg-app" : ""
-                  }`}
+                  className={`flex-row items-center justify-between py-3 ${!isLast ? "border-b border-bg-app" : ""
+                    }`}
                 >
                   <View className="flex-row items-center flex-1 mr-2">
                     <View
-                      className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${
-                        isIncome ? "bg-emerald-subtle" : "bg-rose-subtle"
-                      }`}
+                      className={`w-10 h-10 rounded-2xl items-center justify-center mr-3 ${isIncome ? "bg-emerald-subtle" : "bg-rose-subtle"
+                        }`}
                     >
                       <Ionicons
                         name={isIncome ? "arrow-down" : "arrow-up"}
@@ -276,7 +263,7 @@ export default function ProfileScreen() {
                         {schedule.title}
                       </Text>
                       <Text className="text-text-muted text-xs font-bold mt-0.5">
-                        ${(schedule.amount_cents / 100).toFixed(2)} • {schedule.frequency}
+                        {formatMoney(schedule.amount_cents)} • {schedule.frequency}
                       </Text>
                     </View>
                   </View>
@@ -356,6 +343,35 @@ export default function ProfileScreen() {
         </Text>
 
         <CartoonCard className="mb-6 p-4">
+          {/* Preferred Currency Selector */}
+          <TouchableOpacity
+            onPress={() => setIsCurrencyPickerVisible(true)}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between py-3 border-b border-bg-app"
+          >
+            <View className="flex-row items-center flex-1 mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
+                <MaterialCommunityIcons name="currency-usd" size={22} color={colors.primary} />
+              </View>
+              <View>
+                <Text className="text-text-main text-sm font-black">
+                  Display Currency
+                </Text>
+                <Text className="text-text-muted text-xs font-bold mt-0.5">
+                  {currencyCode} ({currencySymbol})
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center">
+              <View className="bg-coral-subtle px-2.5 py-1 rounded-full border border-border-card mr-1">
+                <Text className="text-primary text-xs font-black">
+                  {currencyCode}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+
           {/* Security & Biometrics */}
           <View className="flex-row items-center justify-between py-3 border-b border-bg-app">
             <View className="flex-row items-center flex-1 mr-3">
@@ -414,6 +430,14 @@ export default function ProfileScreen() {
       <TipJarModal
         visible={isTipJarVisible}
         onClose={() => setIsTipJarVisible(false)}
+      />
+
+      {/* ─── CURRENCY PICKER MODAL ─── */}
+      <CurrencyPickerModal
+        visible={isCurrencyPickerVisible}
+        onClose={() => setIsCurrencyPickerVisible(false)}
+        selectedCurrencyCode={currencyCode}
+        onSelectCurrency={(code) => setPreferredCurrency(code)}
       />
     </View>
   );

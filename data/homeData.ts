@@ -5,7 +5,7 @@ export interface HeroMetric {
   label: string;
   value: string;
   change: string;
-  trendDirection: "up" | "down";
+  trendDirection: "up" | "down" | "neutral";
 }
 
 export interface HeroData {
@@ -15,7 +15,7 @@ export interface HeroData {
   maxHealthScore: number;
   scoreTrend: {
     text: string;
-    direction: "up" | "down";
+    direction: "up" | "down" | "neutral";
   };
   metrics: HeroMetric[];
 }

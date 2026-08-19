@@ -8,7 +8,7 @@ import { useApp } from "@/context/AppContext";
 
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
-  const { goals, transactions, cashflowSummary } = useApp();
+  const { goals, transactions, cashflowSummary, getGoalContributions, formatMoney } = useApp();
 
   // 1. Savings Rate Calculation
   const savingsRatePercent = useMemo(() => {
@@ -32,35 +32,87 @@ export default function InsightsScreen() {
       )
       .reduce((sum, t) => sum + t.amount_cents, 0);
 
-    return Math.max(0, incomeCents - expenseCents);
+    return incomeCents - expenseCents;
   }, [transactions]);
 
-  // 3. Weekly Streak Calculation (Distinct weeks with transactions)
+  // 3. Weekly Streak Calculation (Consecutive active weeks counting backward from current week)
   const savingsStreakWeeks = useMemo(() => {
-    if (transactions.length === 0) return 1;
-    const uniqueWeeks = new Set<string>();
+    if (transactions.length === 0) return 0;
+
+    const getWeekKey = (date: Date): string => {
+      // Normalize to Monday-based ISO week
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+      return `${d.getUTCFullYear()}-W${weekNo}`;
+    };
+
+    const activeWeeks = new Set<string>();
     for (const t of transactions) {
       const d = new Date(t.transaction_date);
-      const year = d.getFullYear();
-      const weekNum = Math.ceil(
-        ((d.getTime() - new Date(year, 0, 1).getTime()) / 86400000 + 1) / 7
-      );
-      uniqueWeeks.add(`${year}-W${weekNum}`);
+      if (!isNaN(d.getTime())) {
+        activeWeeks.add(getWeekKey(d));
+      }
     }
-    return Math.max(1, uniqueWeeks.size);
+
+    const checkDate = new Date();
+    let streak = 0;
+
+    // Check consecutive weeks backward starting from current week
+    while (activeWeeks.has(getWeekKey(checkDate))) {
+      streak += 1;
+      checkDate.setDate(checkDate.getDate() - 7);
+    }
+
+    return streak;
   }, [transactions]);
 
   // 4. Primary Goal Projected Completion Date
+  const [primaryGoalContributions30DCents, setPrimaryGoalContributions30DCents] =
+    React.useState<number>(0);
+
+  const primaryGoal = goals.length > 0 ? goals[0] : null;
+  const primaryGoalId = primaryGoal?.id;
+
+  React.useEffect(() => {
+    let isMounted = true;
+    if (!primaryGoalId) {
+      setPrimaryGoalContributions30DCents(0);
+      return;
+    }
+
+    const cutoffDate = new Date(Date.now() - 30 * 86400000).toISOString();
+    getGoalContributions(primaryGoalId, { since: cutoffDate })
+      .then((rows) => {
+        if (!isMounted) return;
+        const totalCents = rows.reduce(
+          (sum, r) => sum + (r.amount_cents > 0 ? r.amount_cents : 0),
+          0
+        );
+        setPrimaryGoalContributions30DCents(totalCents);
+      })
+      .catch((err) => {
+        console.error("Failed to load goal contributions:", err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [primaryGoalId, getGoalContributions, transactions]);
+
   const projectionInfo = useMemo(() => {
-    if (goals.length === 0) {
+    if (!primaryGoal) {
       return {
         title: "Create a Goal",
         message: "Add your first savings goal to get smart pace estimates!",
         daysAhead: 0,
+        hasPace: false,
+        paceLabel: "No Active Goal",
       };
     }
 
-    const primaryGoal = goals[0];
     const remainingCents = Math.max(
       0,
       (primaryGoal.target_amount_cents || 0) -
@@ -72,35 +124,38 @@ export default function InsightsScreen() {
         title: `${primaryGoal.title} Completed! 🏆`,
         message: "You've successfully reached 100% of your target amount!",
         daysAhead: 0,
+        hasPace: false,
+        paceLabel: "Goal Completed",
       };
     }
 
-    // Daily savings rate based on 30-day velocity
-    const dailyVelocityCents = past30DaysVelocityCents / 30;
-    if (dailyVelocityCents <= 0) {
+    // Daily savings rate based on 30-day contributions to this specific goal
+    const dailyGoalRateCents = primaryGoalContributions30DCents / 30;
+    if (dailyGoalRateCents <= 0) {
       return {
         title: `Saving for ${primaryGoal.title}`,
-        message: `Keep allocating deposits to reach your $${(
-          primaryGoal.target_amount_cents / 100
-        ).toLocaleString()} target.`,
+        message: `Keep allocating deposits to reach your ${formatMoney(
+          primaryGoal.target_amount_cents
+        )} target.`,
         daysAhead: 0,
+        hasPace: false,
+        paceLabel: "Needs Deposits",
       };
     }
 
-    const daysRemaining = Math.ceil(remainingCents / dailyVelocityCents);
+    const daysRemaining = Math.ceil(remainingCents / dailyGoalRateCents);
     return {
       title: `On Track for ${primaryGoal.title}!`,
-      message: `At your current velocity of $${Math.round(
-        past30DaysVelocityCents / 100
+      message: `At your current velocity of ${formatMoney(
+        primaryGoalContributions30DCents
       )}/mo, you are projected to reach your goal in ~${daysRemaining} days!`,
       daysAhead: 14,
+      hasPace: true,
+      paceLabel: "Active Pace",
     };
-  }, [goals, past30DaysVelocityCents]);
+  }, [primaryGoal, primaryGoalContributions30DCents, formatMoney]);
 
-  const velocityDollars = (past30DaysVelocityCents / 100).toLocaleString(
-    undefined,
-    { minimumFractionDigits: 0, maximumFractionDigits: 0 }
-  );
+  const velocityFormatted = formatMoney(past30DaysVelocityCents);
 
   return (
     <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
@@ -132,7 +187,7 @@ export default function InsightsScreen() {
               </Text>
               <View className="bg-coral-subtle px-2 py-0.5 rounded-full border border-border-card">
                 <Text className="text-primary text-[10px] font-black uppercase">
-                  Active Pace
+                  {projectionInfo.paceLabel}
                 </Text>
               </View>
             </View>
@@ -157,7 +212,7 @@ export default function InsightsScreen() {
           </View>
 
           <View className="flex-row items-baseline mb-3">
-            <Text className="text-primary text-3xl font-black">${velocityDollars}</Text>
+            <Text className="text-primary text-3xl font-black">{velocityFormatted}</Text>
             <Text className="text-text-muted text-xs font-bold ml-2">
               net cashflow accumulated
             </Text>
@@ -170,9 +225,9 @@ export default function InsightsScreen() {
                 width: `${Math.min(
                   Math.max(
                     Math.round(
-                      (past30DaysVelocityCents / (1000 * 100 || 1)) * 100
+                      (Math.max(0, past30DaysVelocityCents) / (1000 * 100 || 1)) * 100
                     ),
-                    10
+                    0
                   ),
                   100
                 )}%`,

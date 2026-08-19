@@ -10,7 +10,18 @@ import {
   CategoryRow,
   GoalRow,
   UserEntitlementRow,
+  GoalContributionRow,
+  UserPreferenceRow,
 } from "../services/db/types";
+import {
+  getUserPreferences,
+  updatePreferredCurrency as updatePreferredCurrencyInRepo,
+} from "../repositories/userPreferenceRepo";
+import {
+  getCurrencySymbol,
+  formatCurrencyCents,
+  DEFAULT_CURRENCY_CODE,
+} from "../constants/currencies";
 import {
   getAllCategories,
   getCategoriesByType,
@@ -20,6 +31,7 @@ import {
   getAllGoals,
   updateGoal as updateGoalInRepo,
   applyGoalDelta as applyGoalDeltaInRepo,
+  getGoalContributions as getGoalContributionsInRepo,
   CreateGoalInput,
   UpdateGoalInput,
 } from "../repositories/goalRepo";
@@ -54,6 +66,9 @@ interface AppContextType {
   transactions: EnrichedTransactionRow[];
   cashflowSummary: CashflowSummary;
   entitlements: UserEntitlementRow;
+  preferences: UserPreferenceRow;
+  currencyCode: string;
+  currencySymbol: string;
   categories: CategoryRow[];
   recurringSchedules: RecurringScheduleRow[];
   isLoading: boolean;
@@ -62,10 +77,13 @@ interface AppContextType {
 
   // Actions
   refreshData: () => Promise<void>;
+  setPreferredCurrency: (code: string) => Promise<void>;
+  formatMoney: (cents: number, options?: { compact?: boolean; showSign?: boolean }) => string;
   fetchTransactions: (options?: TransactionFilterOptions) => Promise<EnrichedTransactionRow[]>;
   addTransaction: (
     tx: InsertTransactionInput,
-    goalAllocation?: GoalAllocationInput
+    goalAllocation?: GoalAllocationInput,
+    recurringSchedule?: CreateRecurringScheduleInput
   ) => Promise<void>;
   createGoal: (goal: CreateGoalInput) => Promise<GoalRow>;
   updateGoal: (id: string, fields: UpdateGoalInput) => Promise<GoalRow | null>;
@@ -75,12 +93,24 @@ interface AppContextType {
     transactionId?: string,
     note?: string
   ) => Promise<GoalRow>;
+  getGoalContributions: (
+    goalId: string,
+    options?: { since?: string }
+  ) => Promise<GoalContributionRow[]>;
   unlockGoalSlot: () => Promise<void>;
   setSupporterStatus: (isSupporter: boolean, unlockedGoalSlots?: number) => Promise<void>;
   toggleRecurring: (id: string, isActive?: boolean) => Promise<void>;
   deleteRecurring: (id: string) => Promise<void>;
   createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
 }
+
+const defaultPreferences: UserPreferenceRow = {
+  id: "default_user",
+  preferred_currency: "USD",
+  biometrics_enabled: 0,
+  reminders_enabled: 1,
+  created_at: new Date().toISOString(),
+};
 
 const defaultEntitlements: UserEntitlementRow = {
   id: "default_entitlements",
@@ -105,14 +135,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
   const [entitlements, setEntitlements] =
     useState<UserEntitlementRow>(defaultEntitlements);
+  const [preferences, setPreferences] =
+    useState<UserPreferenceRow>(defaultPreferences);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [recurringSchedules, setRecurringSchedules] = useState<RecurringScheduleRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const currencyCode = preferences.preferred_currency || DEFAULT_CURRENCY_CODE;
+  const currencySymbol = getCurrencySymbol(currencyCode);
+
   // Monotonically increasing generation ref to track latest refreshData invocation
   const refreshGenerationRef = useRef(0);
+  // Monotonically increasing revision ref to track local recurring mutations
+  const recurringMutationRevisionRef = useRef(0);
 
   /**
    * Refreshes all core entities from SQLite asynchronously.
@@ -120,6 +157,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    */
   const refreshData = useCallback(async () => {
     const currentGeneration = ++refreshGenerationRef.current;
+    const capturedRecurringRevision = recurringMutationRevisionRef.current;
 
     try {
       setIsLoading(true);
@@ -130,6 +168,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchedTransactions,
         fetchedCashflow,
         fetchedEntitlements,
+        fetchedPreferences,
         fetchedCategories,
         fetchedRecurring,
       ] = await Promise.all([
@@ -137,6 +176,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getTransactions({ limit: 50 }),
         getCashflowSummary(),
         getUserEntitlements(),
+        getUserPreferences(),
         getAllCategories(),
         getRecurringSchedules(),
       ]);
@@ -147,8 +187,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setTransactions(fetchedTransactions);
         setCashflowSummary(fetchedCashflow);
         setEntitlements(fetchedEntitlements);
+        setPreferences(fetchedPreferences);
         setCategories(fetchedCategories);
-        setRecurringSchedules(fetchedRecurring);
+        if (recurringMutationRevisionRef.current === capturedRecurringRevision) {
+          setRecurringSchedules(fetchedRecurring);
+        }
         setIsReady(true);
       }
     } catch (err) {
@@ -185,9 +228,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addTransaction = useCallback(
     async (
       tx: InsertTransactionInput,
-      goalAllocation?: GoalAllocationInput
+      goalAllocation?: GoalAllocationInput,
+      recurringSchedule?: CreateRecurringScheduleInput
     ) => {
-      await insertTransactionInRepo(tx, goalAllocation);
+      await insertTransactionInRepo(tx, goalAllocation, recurringSchedule);
       await refreshData();
     },
     [refreshData]
@@ -269,6 +313,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    */
   const toggleRecurring = useCallback(
     async (id: string, isActive?: boolean) => {
+      recurringMutationRevisionRef.current += 1;
       const updated = await toggleRecurringScheduleInRepo(id, isActive);
       if (updated) {
         setRecurringSchedules((prev) =>
@@ -283,6 +328,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    * Delete a recurring schedule.
    */
   const deleteRecurring = useCallback(async (id: string) => {
+    recurringMutationRevisionRef.current += 1;
     await deleteRecurringScheduleInRepo(id);
     setRecurringSchedules((prev) => prev.filter((s) => s.id !== id));
   }, []);
@@ -292,6 +338,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
    */
   const createRecurringSchedule = useCallback(
     async (input: CreateRecurringScheduleInput) => {
+      recurringMutationRevisionRef.current += 1;
       const created = await createRecurringScheduleInRepo(input);
       setRecurringSchedules((prev) => [...prev, created]);
       return created;
@@ -299,22 +346,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  /**
+   * Fetch goal contributions for a specific goal.
+   */
+  const getGoalContributions = useCallback(
+    async (goalId: string, options?: { since?: string }) => {
+      return getGoalContributionsInRepo(goalId, options);
+    },
+    []
+  );
+
+  /**
+   * Updates preferred currency in SQLite and updates local context.
+   */
+  const setPreferredCurrency = useCallback(async (code: string) => {
+    const updated = await updatePreferredCurrencyInRepo(code);
+    setPreferences(updated);
+  }, []);
+
+  /**
+   * Helper to format an amount in cents with active preferred currency.
+   */
+  const formatMoney = useCallback(
+    (cents: number, options?: { compact?: boolean; showSign?: boolean }) => {
+      return formatCurrencyCents(cents, currencyCode, options);
+    },
+    [currencyCode]
+  );
+
   const value: AppContextType = {
     goals,
     transactions,
     cashflowSummary,
     entitlements,
+    preferences,
+    currencyCode,
+    currencySymbol,
     categories,
     recurringSchedules,
     isLoading,
     isReady,
     error,
     refreshData,
+    setPreferredCurrency,
+    formatMoney,
     fetchTransactions,
     addTransaction,
     createGoal,
     updateGoal,
     contributeToGoal,
+    getGoalContributions,
     unlockGoalSlot,
     setSupporterStatus,
     toggleRecurring,

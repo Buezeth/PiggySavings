@@ -4,7 +4,9 @@ import {
   TransactionRow,
   TransactionType,
   CategoryRow,
+  RecurringScheduleRow,
 } from "../services/db/types";
+import { CreateRecurringScheduleInput } from "./recurringRepo";
 
 export interface InsertTransactionInput {
   id?: string;
@@ -60,17 +62,19 @@ export async function getTransactionById(
 }
 
 /**
- * Insert a transaction and optional goal contribution in an atomic batch (ACID).
+ * Insert a transaction and optional goal contribution and recurring schedule in an atomic batch (ACID).
  */
 export async function insertTransaction(
   tx: InsertTransactionInput,
-  goalAllocation?: GoalAllocationInput
-): Promise<TransactionRow> {
+  goalAllocation?: GoalAllocationInput,
+  recurringSchedule?: CreateRecurringScheduleInput
+): Promise<{ transaction: TransactionRow; recurringSchedule?: RecurringScheduleRow }> {
   const db = await getDatabase();
   const txId = tx.id ?? Crypto.randomUUID();
   const now = new Date().toISOString();
   const txDate = tx.transaction_date ?? now;
   const roundedAmountCents = Math.round(tx.amount_cents);
+  const scheduleId = recurringSchedule ? Crypto.randomUUID() : undefined;
 
   await runInExclusiveTransaction(db, async (txn) => {
     // 1. Insert transaction
@@ -135,13 +139,61 @@ export async function insertTransaction(
         ]
       );
     }
+    // 3. If recurring schedule specified, insert recurring schedule atomically
+    if (recurringSchedule && scheduleId) {
+      const nextOccurrence =
+        recurringSchedule.next_occurrence ?? recurringSchedule.start_date;
+      const isActive = recurringSchedule.is_active ?? 1;
+      const roundedScheduleCents = Math.round(recurringSchedule.amount_cents);
+
+      await txn.runAsync(
+        `INSERT INTO recurring_schedules (
+          id,
+          category_id,
+          title,
+          type,
+          amount_cents,
+          frequency,
+          custom_interval_days,
+          day_of_month,
+          start_date,
+          next_occurrence,
+          is_active,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        [
+          scheduleId,
+          recurringSchedule.category_id,
+          recurringSchedule.title,
+          recurringSchedule.type,
+          roundedScheduleCents,
+          recurringSchedule.frequency,
+          recurringSchedule.custom_interval_days ?? null,
+          recurringSchedule.day_of_month ?? null,
+          recurringSchedule.start_date,
+          nextOccurrence,
+          isActive,
+          now,
+        ]
+      );
+    }
   });
 
   const inserted = await getTransactionById(txId);
   if (!inserted) {
     throw new Error(`Failed to retrieve inserted transaction with ID: ${txId}`);
   }
-  return inserted;
+
+  let insertedSchedule: RecurringScheduleRow | undefined;
+  if (scheduleId) {
+    const row = await db.getFirstAsync<RecurringScheduleRow>(
+      `SELECT * FROM recurring_schedules WHERE id = ?;`,
+      [scheduleId]
+    );
+    insertedSchedule = row ?? undefined;
+  }
+
+  return { transaction: inserted, recurringSchedule: insertedSchedule };
 }
 
 /**
