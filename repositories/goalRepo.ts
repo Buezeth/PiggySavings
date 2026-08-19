@@ -1,6 +1,6 @@
 import * as Crypto from "expo-crypto";
 import { getDatabase, runInExclusiveTransaction } from "../services/db/database";
-import { GoalRow, GoalStatus, CardVariant } from "../services/db/types";
+import { GoalRow, GoalStatus, CardVariant, GoalContributionRow } from "../services/db/types";
 
 export interface CreateGoalInput {
   title: string;
@@ -61,18 +61,6 @@ export async function getGoalById(id: string): Promise<GoalRow | null> {
   );
   return row ?? null;
 }
-
-import { createGuardedGoal } from "../services/monetization/entitlementGuard";
-
-/**
- * Creates a new savings goal guarded by user entitlements.
- * Delegates to createGuardedGoal to enforce atomic count, entitlement checks, and insertion.
- */
-export async function createGoal(goal: CreateGoalInput): Promise<GoalRow> {
-  return createGuardedGoal(goal);
-}
-
-export { createGuardedGoal };
 
 /**
  * Update metadata and fields for a goal.
@@ -199,4 +187,27 @@ export async function applyGoalDelta(
     throw new Error(`Failed to fetch updated goal with ID: ${goalId}`);
   }
   return updatedGoal;
+}
+
+/**
+ * Fetch contribution / allocation history for a specific goal.
+ */
+export async function getGoalContributions(
+  goalId: string,
+  options?: { since?: string }
+): Promise<GoalContributionRow[]> {
+  const db = await getDatabase();
+  const whereClauses = ["goal_id = ?"];
+  const params: string[] = [goalId];
+
+  if (options?.since) {
+    whereClauses.push("created_at >= ?");
+    params.push(options.since);
+  }
+
+  const rows = await db.getAllAsync<GoalContributionRow>(
+    `SELECT * FROM goal_contributions WHERE ${whereClauses.join(" AND ")} ORDER BY created_at DESC;`,
+    params
+  );
+  return rows;
 }

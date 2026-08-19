@@ -1,19 +1,25 @@
 import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
-import { Ionicons } from "@expo/vector-icons";
+import { useApp } from "@/context/AppContext";
+import { RecurringFrequency } from "@/services/db/types";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -30,126 +36,138 @@ const generateUUIDv4 = (): string => {
 export default function AddTransactionModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { goals, categories, currencyCode, currencySymbol, addTransaction, createRecurringSchedule } = useApp();
+
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
-  const [selectedGoal, setSelectedGoal] = useState("Dream Studio Setup");
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  const goals = [
-    "Dream Studio Setup",
-    "Japan Trip",
-    "Emergency Fund",
-    "General Savings",
-  ];
+  // Recurring Schedule State
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
+  const [isNoteFocused, setIsNoteFocused] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<TextInput>(null);
 
-  const persistTransactionBatch = async (
-    records: Array<{
-      type: "outbox" | "goal_delta";
-      record: Record<string, unknown>;
-    }>
-  ) => {
-    // Atomic local persistence batch execution
-    const persistedIds: string[] = [];
-    try {
-      for (const item of records) {
-        if (__DEV__) {
-          console.log(`[Persistence] Writing ${item.type} record:`, item.record);
-        }
-        persistedIds.push((item.record as { id: string }).id);
-      }
-      return { success: true };
-    } catch (err) {
-      if (__DEV__) {
-        console.error("[Persistence] Transaction batch write failed, rolling back:", err);
-      }
-      return { success: false, error: err };
+  const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
+
+  // Filter categories matching current type
+  const matchingCategories = useMemo(() => {
+    return categories.filter((c) => c.type === type);
+  }, [categories, type]);
+
+  // Set default category when type changes
+  React.useEffect(() => {
+    if (matchingCategories.length > 0) {
+      setSelectedCategoryId(matchingCategories[0].id);
+    } else {
+      setSelectedCategoryId(null);
     }
-  };
+  }, [matchingCategories]);
+
+  // Listen for keyboard dismiss (e.g. Android back/down arrow or iOS dismiss) to reset headroom
+  React.useEffect(() => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      noteInputRef.current?.blur();
+      setIsNoteFocused(false);
+    });
+
+    return () => {
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleSave = async () => {
-    const trimmedAmount = amount.trim();
-    // Validate format: positive number with at most 2 decimal places and no non-numeric characters
-    if (!/^\d+(\.\d{1,2})?$/.test(trimmedAmount)) {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const parsedResult = parseCurrencyToCents(amount, currencyCode);
+    if (!parsedResult) {
       Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
       return;
     }
 
-    const [integerPart, fractionalPart = ""] = trimmedAmount.split(".");
-    const normalizedFraction = (fractionalPart + "00").slice(0, 2);
-    const amountInCents =
-      parseInt(integerPart, 10) * 100 + parseInt(normalizedFraction, 10);
-
-    if (!Number.isSafeInteger(amountInCents) || amountInCents <= 0) {
-      Alert.alert("Invalid Amount", "Please enter a valid positive transaction amount.");
+    if (parsedResult.error) {
+      Alert.alert("Invalid Amount", parsedResult.error);
       return;
     }
+
+    const amountInCents = parsedResult.cents;
+
+    const categoryId = matchingCategories.some(
+      (category) => category.id === selectedCategoryId
+    )
+      ? selectedCategoryId
+      : null;
+
+    if (!categoryId) {
+      Alert.alert("Category Required", "Select a category before you save this transaction.");
+      return;
+    }
+
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
+    const transactionDate = new Date().toISOString();
 
-    // Construct local transaction object
-    const transactionRecord = {
-      id: transactionId,
-      idempotency_key: idempotencyKey,
-      type,
-      amount_cents: amountInCents,
-      note: note.trim(),
-      selected_goal: selectedGoal || null,
-      created_at: new Date().toISOString(),
-    };
-
-    // Construct offline outbox record for sync engine
-    const outboxRecord = {
-      id: generateUUIDv4(),
-      event_type: "TRANSACTION_CREATED",
-      payload: transactionRecord,
-      synced: false,
-      created_at: new Date().toISOString(),
-    };
-
-    // Construct Delta Event log when selectedGoal is present
-    let goalDeltaRecord = null;
-    if (selectedGoal) {
-      const deltaCents = type === "income" ? amountInCents : -amountInCents;
-      goalDeltaRecord = {
-        id: generateUUIDv4(),
-        event_type: "GOAL_BALANCE_DELTA",
-        goal_id: selectedGoal,
-        delta_cents: deltaCents,
-        idempotency_key: generateUUIDv4(),
-        created_at: new Date().toISOString(),
-      };
-    }
-
-    const batchRecords: Array<{
-      type: "outbox" | "goal_delta";
-      record: Record<string, unknown>;
-    }> = [{ type: "outbox", record: outboxRecord }];
-
-    if (goalDeltaRecord) {
-      batchRecords.push({ type: "goal_delta", record: goalDeltaRecord });
-    }
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     try {
-      const result = await persistTransactionBatch(batchRecords);
-      if (!result.success) {
-        throw result.error || new Error("Persistence error");
-      }
-      // Call router.back() only after all local writes succeed
+      // Insert Transaction with optional goal contribution and recurring schedule atomically (ACID)
+      await addTransaction(
+        {
+          id: transactionId,
+          category_id: categoryId,
+          type,
+          amount_cents: amountInCents,
+          note: note.trim() || (type === "income" ? "Income Deposit" : "Expense"),
+          transaction_date: transactionDate,
+          idempotency_key: idempotencyKey,
+        },
+        type === "income" && selectedGoalId
+          ? {
+            goal_id: selectedGoalId,
+            amount_cents: amountInCents,
+            note: note.trim() || "Auto-allocated from quick transaction",
+            idempotency_key: generateUUIDv4(),
+          }
+          : undefined,
+        isRecurring
+          ? {
+            category_id: categoryId,
+            title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
+            type,
+            amount_cents: amountInCents,
+            frequency: frequency === "biweekly" ? "custom" : frequency,
+            custom_interval_days: frequency === "biweekly" ? 15 : undefined,
+            start_date: transactionDate,
+          }
+          : undefined
+      );
+
       router.back();
-    } catch {
-      Alert.alert("Error", "Failed to persist local transaction record.");
+    } catch (err) {
+      console.error("Failed to save transaction:", err);
+      Alert.alert("Error", err instanceof Error ? err.message : "Failed to record transaction.");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-bg-app"
     >
       <View
         style={{
           paddingTop: Math.max(insets.top, 16),
-          paddingBottom: Math.max(insets.bottom, 16),
         }}
         className="flex-1 px-6"
       >
@@ -168,22 +186,27 @@ export default function AddTransactionModal() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingBottom: Math.max(insets.bottom, 16) + (isNoteFocused ? 280 : 32),
+          }}
+        >
           {/* Income vs Expense Tactile Segmented Switch */}
-          <View className="flex-row bg-bg-card p-1.5 rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark mb-6">
+          <View className="flex-row bg-bg-card p-1.5 rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark mb-5">
             <TouchableOpacity
               onPress={() => setType("income")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
-                type === "income"
-                  ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
-                  : "bg-transparent"
-              }`}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "income"
+                ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
+                : "bg-transparent"
+                }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${
-                  type === "income" ? "text-white" : "text-text-muted"
-                }`}
+                className={`will-change-variable text-xs font-black ${type === "income" ? "text-white" : "text-text-muted"
+                  }`}
               >
                 + Income / Funding
               </Text>
@@ -192,104 +215,223 @@ export default function AddTransactionModal() {
             <TouchableOpacity
               onPress={() => setType("expense")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
-                type === "expense"
-                  ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
-                  : "bg-transparent"
-              }`}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "expense"
+                ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
+                : "bg-transparent"
+                }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${
-                  type === "expense" ? "text-white" : "text-text-muted"
-                }`}
+                className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
+                  }`}
               >
                 - Expense / Spent
               </Text>
             </TouchableOpacity>
           </View>
 
-          {/* Amount Input (Dynamic CartoonCard depending on Income vs Expense) */}
+          {/* Amount Input */}
           <CartoonCard
             variant={type === "income" ? "income" : "expense"}
-            className="mb-6 p-5 items-center"
+            className="mb-5 p-5 items-center"
           >
             <Text className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">
               Transaction Amount
             </Text>
             <View className="flex-row items-center justify-center">
               <Text
-                className={`text-3xl font-black mr-1 ${
-                  type === "income" ? "text-emerald" : "text-rose"
-                }`}
+                className={`will-change-variable text-3xl font-black mr-1 ${type === "income" ? "text-emerald" : "text-rose"
+                  }`}
               >
-                {type === "income" ? "+$" : "-$"}
+                {type === "income" ? `+${currencySymbol.trim()}` : `-${currencySymbol.trim()}`}
               </Text>
               <TextInput
                 value={amount}
                 onChangeText={setAmount}
-                placeholder="0.00"
+                placeholder={activeCurrency.decimal_digits === 0 ? "0" : "0.00"}
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className={`text-4xl font-black flex-1 ${
-                  type === "income" ? "text-emerald" : "text-rose"
-                }`}
+                className={`will-change-variable text-4xl font-black flex-1 ${type === "income" ? "text-emerald" : "text-rose"
+                  }`}
               />
             </View>
+            {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+              <Text className="text-text-muted text-[11px] font-bold mt-1">
+                {activeCurrency.rounding > 0
+                  ? `Rounds to nearest ${activeCurrency.rounding} step`
+                  : "Zero-decimal currency"}
+              </Text>
+            )}
           </CartoonCard>
 
-          {/* Goal Allocation Selector */}
-          <Text className="text-text-main text-sm font-black mb-3">
-            Target Goal Auto-Allocation
+          {/* Category Selector */}
+          <Text className="text-text-main text-sm font-black mb-2">
+            Category
           </Text>
-          <View className="flex-row flex-wrap gap-2.5 mb-6">
-            {goals.map((g) => {
-              const isSelected = selectedGoal === g;
+          <View className="flex-row flex-wrap gap-2 mb-5">
+            {matchingCategories.map((c) => {
+              const isSelected = selectedCategoryId === c.id;
               return (
                 <TouchableOpacity
-                  key={g}
+                  key={c.id}
                   activeOpacity={0.8}
-                  onPress={() => setSelectedGoal(g)}
-                  className={`will-change-variable px-4 py-2.5 rounded-2xl border-2 ${
-                    isSelected
-                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                  }`}
+                  onPress={() => setSelectedCategoryId(c.id)}
+                  className={`will-change-variable px-3 py-2 rounded-2xl border-2 ${isSelected
+                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                    }`}
                 >
                   <Text
-                    className={`text-xs font-black ${
-                      isSelected ? "text-primary" : "text-text-main"
-                    }`}
+                    className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                      }`}
                   >
-                    🎯 {g}
+                    {c.name}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
+          {/* Goal Allocation Selector (Optional - Income Only) */}
+          {type === "income" && (
+            <>
+              <Text className="text-text-main text-sm font-black mb-2">
+                Target Goal Auto-Allocation (Optional)
+              </Text>
+              <View className="flex-row flex-wrap gap-2 mb-5">
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedGoalId(null)}
+                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${selectedGoalId === null
+                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                    }`}
+                >
+                  <Text
+                    className={`will-change-variable text-xs font-black ${selectedGoalId === null ? "text-primary" : "text-text-muted"
+                      }`}
+                  >
+                    None
+                  </Text>
+                </TouchableOpacity>
+
+                {goals.map((g) => {
+                  const isSelected = selectedGoalId === g.id;
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedGoalId(g.id)}
+                      className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${isSelected
+                        ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                        : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                        }`}
+                    >
+                      <Text
+                        className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                          }`}
+                      >
+                        🎯 {g.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
           {/* Description / Note */}
           <Text className="text-text-main text-sm font-black mb-2">
             Description / Note
           </Text>
-          <CartoonCard className="mb-6 p-3.5">
+          <CartoonCard className="mb-5 p-3.5">
             <TextInput
+              ref={noteInputRef}
               value={note}
               onChangeText={setNote}
-              placeholder="e.g., Freelance Project Payout, Client deposit..."
+              onFocus={() => {
+                setIsNoteFocused(true);
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollTo({ y: 260, animated: true });
+                }, 100);
+              }}
+              onBlur={() => {
+                setIsNoteFocused(false);
+              }}
+              placeholder="e.g., Paycheck, Client Deposit, Groceries..."
               placeholderTextColor={colors.textMuted}
               className="text-sm text-text-main font-semibold"
             />
           </CartoonCard>
 
+          {/* Schedule as Recurring Toggle */}
+          <CartoonCard className="mb-6 p-4">
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="w-9 h-9 rounded-xl bg-coral-subtle items-center justify-center mr-2.5">
+                  <MaterialCommunityIcons name="repeat" size={20} color={colors.primary} />
+                </View>
+                <View>
+                  <Text className="text-text-main text-sm font-black">
+                    Schedule as Recurring
+                  </Text>
+                  <Text className="text-text-muted text-[11px] font-bold">
+                    Automatically log this transaction on schedule
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={isRecurring}
+                onValueChange={setIsRecurring}
+                trackColor={{ false: colors.mutedTrack, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+
+            {/* Recurring Frequency options */}
+            {isRecurring && (
+              <View className="mt-3 pt-3 border-t border-border-card">
+                <Text className="text-text-muted text-xs font-bold uppercase mb-2">
+                  Frequency Interval
+                </Text>
+                <View className="flex-row gap-2">
+                  {(
+                    [
+                      { id: "weekly", label: "Weekly" },
+                      { id: "biweekly", label: "Every 15 Days" },
+                      { id: "monthly", label: "Monthly" },
+                    ] as const
+                  ).map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => setFrequency(item.id)}
+                      className={`will-change-variable px-3 py-1.5 rounded-full border ${frequency === item.id
+                        ? "bg-primary border-primary-dark"
+                        : "bg-bg-app border-border-card"
+                        }`}
+                    >
+                      <Text
+                        className={`will-change-variable text-xs font-black ${frequency === item.id ? "text-white" : "text-text-muted"
+                          }`}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+          </CartoonCard>
+
           {/* Tactile Gamified Submit Button */}
           <TouchableOpacity
             onPress={handleSave}
+            disabled={isSubmitting}
             activeOpacity={0.85}
             className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-4 items-center justify-center mb-8"
           >
             <Text className="text-white text-base font-black uppercase tracking-wider">
-              Save Transaction & Allocate 🎯
+              {isSubmitting ? "Recording..." : "Save Transaction & Allocate 🎯"}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -297,4 +439,5 @@ export default function AddTransactionModal() {
     </KeyboardAvoidingView>
   );
 }
+
 

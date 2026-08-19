@@ -65,10 +65,30 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 ### 4. Data Model & Atomic Financial Calculations
 - **Integer Cents Precision**: **NEVER** use standard floating-point numbers for money. All transaction amounts, goal targets, and balances **MUST** be stored as integer cents (`amount_cents INTEGER`, e.g., $10.50 stored as `1050`).
-- **Atomic Balance Updates**: Goal balances and transaction entries must always execute within atomic database transactions (`db.withTransactionAsync`) to guarantee ACID compliance.
-- **Client Idempotency**: Attach client UUID v4 `idempotency_key` to all transaction and contribution creations to prevent double insertions.
+- **Dynamic Multi-Currency Formatting**:
+  - **FORBIDDEN**: AI agents must **NEVER** hardcode dollar signs (e.g. `"$"` or `+$${...}`) in JSX labels or text templates.
+  - All currency rendering **MUST** consume dynamic formatting from `useApp()` (`formatMoney(cents, options)`) or `currencySymbol` to respect the user's chosen display currency (stored in `user_preferences.preferred_currency`).
+- **Atomic Balance Updates & Bundled Mutations**:
+  - Goal balances, transaction entries, and associated recurring schedules must always execute within atomic database transactions (`runInExclusiveTransaction` / `db.withTransactionAsync`) to guarantee ACID compliance.
+  - Multi-entity workflows (e.g. logging a transaction + goal allocation + recurring schedule) must be committed in a single database transaction so that a failure in one operation never leaves orphaned records.
+- **Client Idempotency & Re-entrancy Protection**:
+  - Attach client UUID v4 `idempotency_key` to all transaction and contribution creations to prevent double insertions.
+  - Form submissions and mutation handlers **MUST** use synchronous `useRef` guards (e.g., `isSubmittingRef.current`) to immediately reject duplicate / rapid multi-tap submissions, reliably releasing the guard in `finally` blocks across all completion paths.
+- **State Race Condition & Mutation Revision Tracking**:
+  - Central reactive contexts (e.g., `AppContext`) must maintain monotonically increasing generation and mutation revision refs (e.g., `refreshGenerationRef`, `recurringMutationRevisionRef`).
+  - Capture snapshot revisions at query dispatch and verify that local optimistic mutations are not overwritten by stale asynchronous `refreshData` results.
 
-### 5. On-Device Push Notifications & Behavioral Nudges
+### 5. Analytics & Projection Integrity
+- **Signed Velocity Calculations**: Financial velocity metrics (e.g., 30-day net cashflow) must compute the true signed difference (`income - expenses`). Never clamp the underlying metric to zero; clamp only the visual width of progress bars (`Math.max(0, ...)`).
+- **Goal-Specific Completion Projections**: Projections for individual goals (e.g., days remaining estimates) must be derived from contributions specific to that goal rather than global app cashflow.
+- **Dynamic Trend & Pace States**:
+  - Derive trend directions (`"up" | "down" | "neutral"`) from computed numerical thresholds rather than hardcoded positive assumptions.
+  - Provide explicit status indicators (e.g., `hasPace: boolean`, `paceLabel`) covering all states including empty history, completed goals, and zero-velocity periods.
+- **Calendar-Day Date Comparisons**:
+  - Always validate timestamps (`!isNaN(d.getTime())`) before formatting.
+  - Group and compare dates using calendar year/month/date boundaries instead of elapsed-millisecond division to ensure correct "Today" and "Yesterday" labeling across midnight boundaries.
+
+### 6. On-Device Push Notifications & Behavioral Nudges
 - **100% Local Scheduling (`expo-notifications`)**: No remote push servers.
 - Schedules daily logging reminders, weekly progress summaries, milestone celebrations (25%, 50%, 75%, 100%), and streak nudges directly on the operating system's local notification daemon.
 
@@ -132,7 +152,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make saving feel playful and rewarding:
 
 ### 1. Extruded 3D Cards & Buttons (`components/CartoonCard.tsx`)
-- All major content containers, modals, and primary action buttons **MUST** feature a 3D extruded bottom border (`border-2 ... border-b-4 ...`).
+- All major content containers, modals, sheets, and primary action buttons **MUST** feature a 3D extruded bottom border (`border-2 ... border-b-4 ...`) using `<CartoonCard>`.
 - **Color Pairing Rule**: When changing the background of a card/button, **ALWAYS pair it with its corresponding darker extruded bottom border**:
   - **Standard Card**: `bg-bg-card border-border-card border-b-border-card-dark`
   - **Subtle Highlight**: `bg-coral-subtle border-border-card border-b-border-card-dark`
@@ -161,6 +181,10 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make sa
      - Bottom scroll content padding: `contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) }}`
    - **FORBIDDEN**: AI agents must **NEVER** use `<SafeAreaView>` wrapper components (from `react-native` or `react-native-safe-area-context`) or hardcoded fixed paddings (e.g. `paddingBottom: 40`, `pt-4`) for root screen layouts.
    - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view.
-3. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
+3. **Keyboard Visibility & Form Usability**:
+   - Wrap modal/screen form inputs in `<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>` so inputs and submit buttons remain visible when the virtual keyboard is displayed.
+4. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
    - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
-1. **Performance**: 0ms latency UI updates using local SQLite queries and optimistic state updates.
+5. **Transparency & Honesty in Action Feedback**:
+   - Never show simulated success alerts for features that are stubbed or pending full delivery (e.g. cloud sync, file export). Instead, accurately inform the user of the current status or disable the interaction.
+6. **Performance**: 0ms latency UI updates using local SQLite queries and optimistic state updates.

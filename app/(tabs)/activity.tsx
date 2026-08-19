@@ -1,71 +1,66 @@
 import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useApp } from "@/context/AppContext";
 
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
+  const { transactions, cashflowSummary, formatMoney } = useApp();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
 
-  const transactions = [
-    {
-      id: "1",
-      title: "Salary Income",
-      category: "Income",
-      amount: "+$2,500.00",
-      date: "Today, 09:30 AM",
-      isIncome: true,
-      goalAllocated: "Emergency Fund",
-    },
-    {
-      id: "2",
-      title: "Auto-Allocation to Dream Setup",
-      category: "Savings Goal",
-      amount: "-$300.00",
-      date: "Today, 09:31 AM",
-      isIncome: false,
-      goalAllocated: "Dream Studio Setup",
-    },
-    {
-      id: "3",
-      title: "Grocery Shopping",
-      category: "Food & Dining",
-      amount: "-$64.20",
-      date: "Yesterday",
-      isIncome: false,
-    },
-    {
-      id: "4",
-      title: "Freelance Project",
-      category: "Side Income",
-      amount: "+$450.00",
-      date: "Aug 11, 2026",
-      isIncome: true,
-      goalAllocated: "Japan Trip",
-    },
-  ];
+  const totalIncomeFormatted = formatMoney(cashflowSummary.totalIncomeCents);
+  const totalExpenseFormatted = formatMoney(cashflowSummary.totalExpenseCents);
 
-  const totalIncome = transactions
-    .filter((t) => t.isIncome)
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
+  // Filter transactions in memory or from repository
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((item) => {
+      const isIncome = item.type === "income";
+      const matchesSearch =
+        !searchQuery.trim() ||
+        (item.note && item.note.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.category_name &&
+          item.category_name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const totalExpense = transactions
-    .filter((t) => !t.isIncome)
-    .reduce((sum, t) => sum + parseFloat(t.amount.replace(/[^0-9.-]+/g, "")), 0);
+      const matchesFilter =
+        filterType === "all" ||
+        (filterType === "income" && isIncome) ||
+        (filterType === "expense" && !isIncome);
 
-  const filteredTransactions = transactions.filter((item) => {
-    const matchesSearch =
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      filterType === "all" ||
-      (filterType === "income" && item.isIncome) ||
-      (filterType === "expense" && !item.isIncome);
-    return matchesSearch && matchesFilter;
-  });
+      return matchesSearch && matchesFilter;
+    });
+  }, [transactions, searchQuery, filterType]);
+
+  // Format transaction date helper
+  const formatDateLabel = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) {
+        return dateStr;
+      }
+      const now = new Date();
+      const isSameDay = (d1: Date, d2: Date) =>
+        d1.getFullYear() === d2.getFullYear() &&
+        d1.getMonth() === d2.getMonth() &&
+        d1.getDate() === d2.getDate();
+
+      const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+
+      if (isSameDay(d, now)) {
+        return `Today, ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
+      if (isSameDay(d, yesterday)) {
+        return `Yesterday, ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
+      return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
@@ -89,7 +84,7 @@ export default function ActivityScreen() {
               </View>
             </View>
             <Text className="text-emerald text-base font-black">
-              +${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              +{totalIncomeFormatted}
             </Text>
           </CartoonCard>
 
@@ -103,7 +98,7 @@ export default function ActivityScreen() {
               </View>
             </View>
             <Text className="text-rose text-base font-black">
-              -${Math.abs(totalExpense).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              -{totalExpenseFormatted}
             </Text>
           </CartoonCard>
         </View>
@@ -129,7 +124,8 @@ export default function ActivityScreen() {
         <View className="flex-row gap-2 mb-3">
           {(["all", "income", "expense"] as const).map((type) => {
             const isSelected = filterType === type;
-            const label = type === "all" ? "All Activity" : type === "income" ? "Income (+" : "Expense (-";
+            const label =
+              type === "all" ? "All Activity" : type === "income" ? "Income" : "Expense";
 
             let chipClasses = "px-3.5 py-1.5 rounded-full border-2";
             if (isSelected) {
@@ -144,6 +140,8 @@ export default function ActivityScreen() {
               chipClasses += " bg-bg-card border-border-card";
             }
 
+            const textClasses = isSelected ? "text-white font-black" : "text-text-muted font-bold";
+
             return (
               <TouchableOpacity
                 key={type}
@@ -151,39 +149,38 @@ export default function ActivityScreen() {
                 onPress={() => setFilterType(type)}
                 className={`will-change-variable ${chipClasses}`}
               >
-                <Text
-                  className={`will-change-variable text-xs font-black capitalize ${
-                    isSelected ? "text-white" : "text-text-muted"
-                  }`}
-                >
-                  {type === "all" ? "All" : label + ")"}
-                </Text>
+                <Text className={`text-xs ${textClasses}`}>{label}</Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </View>
 
+      {/* Transaction List */}
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 20,
-          paddingBottom: Math.max(insets.bottom, 16),
+          paddingBottom: Math.max(insets.bottom, 20),
         }}
         showsVerticalScrollIndicator={false}
       >
-        <Text className="text-text-muted text-xs font-bold uppercase mb-3 tracking-wider">
-          Transactions ({filteredTransactions.length})
-        </Text>
-
         {filteredTransactions.length === 0 ? (
-          <CartoonCard className="p-6 items-center justify-center">
-            <Text className="text-text-muted text-sm font-bold">
-              No matching transactions found.
+          <CartoonCard className="p-8 items-center justify-center my-6">
+            <View className="w-14 h-14 rounded-full bg-coral-subtle items-center justify-center mb-3">
+              <Ionicons name="receipt-outline" size={28} color={colors.primary} />
+            </View>
+            <Text className="text-text-main text-base font-black mb-1">No Activity Found</Text>
+            <Text className="text-text-muted text-xs font-bold text-center">
+              {searchQuery
+                ? `No transactions match "${searchQuery}".`
+                : "No transactions recorded yet. Tap '+' to log an income or expense!"}
             </Text>
           </CartoonCard>
         ) : (
           filteredTransactions.map((item) => {
-            const variant = item.isIncome ? "income" : "expense";
+            const isIncome = item.type === "income";
+            const variant = isIncome ? "income" : "expense";
+            const formattedAmount = formatMoney(item.amount_cents);
 
             return (
               <CartoonCard
@@ -194,38 +191,31 @@ export default function ActivityScreen() {
                 <View className="flex-row items-center flex-1 pr-2">
                   <View
                     className={`will-change-variable w-11 h-11 rounded-2xl items-center justify-center mr-3 ${
-                      item.isIncome ? "bg-emerald" : "bg-rose"
+                      isIncome ? "bg-emerald" : "bg-rose"
                     }`}
                   >
                     <Ionicons
-                      name={item.isIncome ? "arrow-down" : "arrow-up"}
+                      name={isIncome ? "arrow-down" : "arrow-up"}
                       size={20}
                       color={colors.white}
                     />
                   </View>
                   <View className="flex-1">
                     <Text className="text-text-main text-sm font-black">
-                      {item.title}
+                      {item.note || item.category_name || (isIncome ? "Income" : "Expense")}
                     </Text>
                     <Text className="text-text-muted text-xs font-bold mt-0.5">
-                      {item.category} • {item.date}
+                      {item.category_name || "General"} • {formatDateLabel(item.transaction_date)}
                     </Text>
-                    {item.goalAllocated && (
-                      <View className="bg-white-overlay-80 self-start px-2 py-0.5 rounded-lg mt-1.5 border border-border-card">
-                        <Text className="text-text-main text-[10px] font-black">
-                          🎯 {item.goalAllocated}
-                        </Text>
-                      </View>
-                    )}
                   </View>
                 </View>
 
                 <Text
                   className={`will-change-variable text-base font-black ${
-                    item.isIncome ? "text-emerald" : "text-rose"
+                    isIncome ? "text-emerald" : "text-rose"
                   }`}
                 >
-                  {item.amount}
+                  {isIncome ? `+${formattedAmount}` : `-${formattedAmount}`}
                 </Text>
               </CartoonCard>
             );
@@ -235,4 +225,3 @@ export default function ActivityScreen() {
     </View>
   );
 }
-
