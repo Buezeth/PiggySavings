@@ -1149,12 +1149,7 @@ export function formatCurrencyCents(
   if (options?.compact && baseValue >= 1000) {
     valueStr = `${(baseValue / 1000).toFixed(1)}K`;
   } else {
-    const minDecimals =
-      options?.precision !== undefined
-        ? options.precision
-        : curr.decimal_digits === 0
-        ? 0
-        : 0;
+    const minDecimals = options?.precision !== undefined ? options.precision : 0;
     const maxDecimals =
       options?.precision !== undefined
         ? options.precision
@@ -1168,7 +1163,15 @@ export function formatCurrencyCents(
     });
   }
 
-  const sign = options?.showSign ? (isNegative ? "-" : "+") : isNegative ? "-" : "";
+  const sign = options?.showSign
+    ? isNegative
+      ? "-"
+      : cents > 0
+      ? "+"
+      : ""
+    : isNegative
+    ? "-"
+    : "";
   return `${sign}${curr.symbol}${valueStr}`;
 }
 
@@ -1218,14 +1221,15 @@ export function parseCurrencyToCents(
     }
   }
 
-  // Currencies with limited decimal digits (e.g. 2 decimals)
+  // Decimal places validation (capped at max 2 for integer-cent subunit storage)
   if (curr.decimal_digits > 0) {
+    const allowedDecimals = Math.min(curr.decimal_digits, 2);
     const parts = trimmed.split(".");
-    if (parts[1] && parts[1].length > curr.decimal_digits) {
+    if (parts[1] && parts[1].length > allowedDecimals) {
       return {
         cents: 0,
         roundedValue: 0,
-        error: `${curr.code} supports a maximum of ${curr.decimal_digits} decimal places.`,
+        error: `${curr.code} supports a maximum of ${allowedDecimals} decimal places.`,
       };
     }
   }

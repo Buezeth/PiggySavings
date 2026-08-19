@@ -9,7 +9,7 @@ import {
   getPermissionsAsync,
   requestPermissionsAsync,
 } from "expo-notifications/build/NotificationPermissions";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -33,6 +33,21 @@ export default function ProfileScreen() {
   const [isNotificationsAvailable, setIsNotificationsAvailable] = useState(false);
   const [isTipJarVisible, setIsTipJarVisible] = useState(false);
   const [isCurrencyPickerVisible, setIsCurrencyPickerVisible] = useState(false);
+  const isSettingCurrencyRef = useRef(false);
+
+  const handleSelectCurrency = async (code: string) => {
+    if (isSettingCurrencyRef.current) return;
+    isSettingCurrencyRef.current = true;
+    try {
+      await setPreferredCurrency(code);
+    } catch (err) {
+      console.error("Failed to update preferred currency:", err);
+      Alert.alert("Error", "Could not update currency preference.");
+    } finally {
+      isSettingCurrencyRef.current = false;
+      setIsCurrencyPickerVisible(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -437,7 +452,7 @@ export default function ProfileScreen() {
         visible={isCurrencyPickerVisible}
         onClose={() => setIsCurrencyPickerVisible(false)}
         selectedCurrencyCode={currencyCode}
-        onSelectCurrency={(code) => setPreferredCurrency(code)}
+        onSelectCurrency={handleSelectCurrency}
       />
     </View>
   );

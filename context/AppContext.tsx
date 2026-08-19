@@ -3,62 +3,62 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import {
-  CategoryRow,
-  GoalRow,
-  UserEntitlementRow,
-  GoalContributionRow,
-  UserPreferenceRow,
-} from "../services/db/types";
+  DEFAULT_CURRENCY_CODE,
+  formatCurrencyCents,
+  getCurrencySymbol,
+} from "../constants/currencies";
 import {
+  getAllCategories
+} from "../repositories/categoryRepo";
+import {
+  getUserEntitlements,
+  setSupporterStatus as setSupporterStatusInRepo,
+  unlockGoalSlot as unlockGoalSlotInRepo,
+} from "../repositories/entitlementRepo";
+import {
+  applyGoalDelta as applyGoalDeltaInRepo,
+  CreateGoalInput,
+  getActiveGoals,
+  getGoalContributions as getGoalContributionsInRepo,
+  UpdateGoalInput,
+  updateGoal as updateGoalInRepo
+} from "../repositories/goalRepo";
+import {
+  CreateRecurringScheduleInput,
+  createRecurringSchedule as createRecurringScheduleInRepo,
+  deleteRecurringSchedule as deleteRecurringScheduleInRepo,
+  getRecurringSchedules,
+  toggleRecurringSchedule as toggleRecurringScheduleInRepo,
+} from "../repositories/recurringRepo";
+import {
+  CashflowSummary,
+  EnrichedTransactionRow,
+  getCashflowSummary,
+  getTransactions,
+  GoalAllocationInput,
+  InsertTransactionInput,
+  insertTransaction as insertTransactionInRepo,
+  TransactionFilterOptions,
+} from "../repositories/transactionRepo";
+import {
+  DEFAULT_USER_PREF_ID,
   getUserPreferences,
   updatePreferredCurrency as updatePreferredCurrencyInRepo,
 } from "../repositories/userPreferenceRepo";
 import {
-  getCurrencySymbol,
-  formatCurrencyCents,
-  DEFAULT_CURRENCY_CODE,
-} from "../constants/currencies";
-import {
-  getAllCategories,
-  getCategoriesByType,
-} from "../repositories/categoryRepo";
-import {
-  getActiveGoals,
-  getAllGoals,
-  updateGoal as updateGoalInRepo,
-  applyGoalDelta as applyGoalDeltaInRepo,
-  getGoalContributions as getGoalContributionsInRepo,
-  CreateGoalInput,
-  UpdateGoalInput,
-} from "../repositories/goalRepo";
+  CategoryRow,
+  GoalContributionRow,
+  GoalRow,
+  RecurringScheduleRow,
+  UserEntitlementRow,
+  UserPreferenceRow,
+} from "../services/db/types";
 import { createGuardedGoal } from "../services/monetization/entitlementGuard";
-import {
-  getTransactions,
-  getCashflowSummary,
-  insertTransaction as insertTransactionInRepo,
-  EnrichedTransactionRow,
-  CashflowSummary,
-  InsertTransactionInput,
-  GoalAllocationInput,
-  TransactionFilterOptions,
-} from "../repositories/transactionRepo";
-import {
-  getUserEntitlements,
-  unlockGoalSlot as unlockGoalSlotInRepo,
-  setSupporterStatus as setSupporterStatusInRepo,
-} from "../repositories/entitlementRepo";
-import {
-  getRecurringSchedules,
-  toggleRecurringSchedule as toggleRecurringScheduleInRepo,
-  deleteRecurringSchedule as deleteRecurringScheduleInRepo,
-  createRecurringSchedule as createRecurringScheduleInRepo,
-  CreateRecurringScheduleInput,
-} from "../repositories/recurringRepo";
-import { RecurringScheduleRow } from "../services/db/types";
 
 interface AppContextType {
   // Reactive States
@@ -104,13 +104,13 @@ interface AppContextType {
   createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
 }
 
-const defaultPreferences: UserPreferenceRow = {
-  id: "default_user",
-  preferred_currency: "USD",
+const createDefaultPreferences = (): UserPreferenceRow => ({
+  id: DEFAULT_USER_PREF_ID,
+  preferred_currency: DEFAULT_CURRENCY_CODE,
   biometrics_enabled: 0,
   reminders_enabled: 1,
   created_at: new Date().toISOString(),
-};
+});
 
 const defaultEntitlements: UserEntitlementRow = {
   id: "default_entitlements",
@@ -136,7 +136,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [entitlements, setEntitlements] =
     useState<UserEntitlementRow>(defaultEntitlements);
   const [preferences, setPreferences] =
-    useState<UserPreferenceRow>(defaultPreferences);
+    useState<UserPreferenceRow>(createDefaultPreferences);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [recurringSchedules, setRecurringSchedules] = useState<RecurringScheduleRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -144,7 +144,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const currencyCode = preferences.preferred_currency || DEFAULT_CURRENCY_CODE;
-  const currencySymbol = getCurrencySymbol(currencyCode);
+  const currencySymbol = useMemo(
+    () => getCurrencySymbol(currencyCode),
+    [currencyCode]
+  );
 
   // Monotonically increasing generation ref to track latest refreshData invocation
   const refreshGenerationRef = useRef(0);
@@ -374,34 +377,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [currencyCode]
   );
 
-  const value: AppContextType = {
-    goals,
-    transactions,
-    cashflowSummary,
-    entitlements,
-    preferences,
-    currencyCode,
-    currencySymbol,
-    categories,
-    recurringSchedules,
-    isLoading,
-    isReady,
-    error,
-    refreshData,
-    setPreferredCurrency,
-    formatMoney,
-    fetchTransactions,
-    addTransaction,
-    createGoal,
-    updateGoal,
-    contributeToGoal,
-    getGoalContributions,
-    unlockGoalSlot,
-    setSupporterStatus,
-    toggleRecurring,
-    deleteRecurring,
-    createRecurringSchedule,
-  };
+  const value = useMemo<AppContextType>(
+    () => ({
+      goals,
+      transactions,
+      cashflowSummary,
+      entitlements,
+      preferences,
+      currencyCode,
+      currencySymbol,
+      categories,
+      recurringSchedules,
+      isLoading,
+      isReady,
+      error,
+      refreshData,
+      setPreferredCurrency,
+      formatMoney,
+      fetchTransactions,
+      addTransaction,
+      createGoal,
+      updateGoal,
+      contributeToGoal,
+      getGoalContributions,
+      unlockGoalSlot,
+      setSupporterStatus,
+      toggleRecurring,
+      deleteRecurring,
+      createRecurringSchedule,
+    }),
+    [
+      goals,
+      transactions,
+      cashflowSummary,
+      entitlements,
+      preferences,
+      currencyCode,
+      currencySymbol,
+      categories,
+      recurringSchedules,
+      isLoading,
+      isReady,
+      error,
+      refreshData,
+      setPreferredCurrency,
+      formatMoney,
+      fetchTransactions,
+      addTransaction,
+      createGoal,
+      updateGoal,
+      contributeToGoal,
+      getGoalContributions,
+      unlockGoalSlot,
+      setSupporterStatus,
+      toggleRecurring,
+      deleteRecurring,
+      createRecurringSchedule,
+    ]
+  );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

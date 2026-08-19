@@ -44,6 +44,7 @@ export default function GoalsHomeScreen() {
   const [newGoalTarget, setNewGoalTarget] = useState("");
   const [newGoalCategory, setNewGoalCategory] = useState("Savings");
   const [isSubmittingGoal, setIsSubmittingGoal] = useState(false);
+  const isSubmittingGoalRef = React.useRef(false);
 
   // Dynamic calculations for Hero and Metrics
   const heroData: HeroData = useMemo(() => {
@@ -80,8 +81,7 @@ export default function GoalsHomeScreen() {
       )
       .reduce((sum, t) => sum + t.amount_cents, 0);
 
-    const rawPeriodNetSavingsCents = periodIncomeCents - periodExpenseCents;
-    const periodNetSavingsCents = Math.max(0, rawPeriodNetSavingsCents);
+    const periodNetSavingsCents = periodIncomeCents - periodExpenseCents;
 
     // 3. Health Score calculation (0-100)
     let healthScore = 75; // Baseline healthy score
@@ -127,16 +127,16 @@ export default function GoalsHomeScreen() {
           : "down";
 
     const velocityTrend: "up" | "down" | "neutral" =
-      rawPeriodNetSavingsCents > 0
+      periodNetSavingsCents > 0
         ? "up"
-        : rawPeriodNetSavingsCents === 0
+        : periodNetSavingsCents === 0
           ? "neutral"
           : "down";
 
     const velocityPrefix =
-      rawPeriodNetSavingsCents > 0
+      periodNetSavingsCents > 0
         ? "+"
-        : rawPeriodNetSavingsCents < 0
+        : periodNetSavingsCents < 0
           ? "-"
           : "";
 
@@ -167,7 +167,7 @@ export default function GoalsHomeScreen() {
         {
           id: "velocity",
           label: "Velocity",
-          value: `${velocityPrefix}${formatMoney(Math.abs(rawPeriodNetSavingsCents), { compact: true })}`,
+          value: `${velocityPrefix}${formatMoney(Math.abs(periodNetSavingsCents), { compact: true })}`,
           change: selectedPeriod,
           trendDirection: velocityTrend,
         },
@@ -213,25 +213,30 @@ export default function GoalsHomeScreen() {
 
   // Submit new goal
   const handleSaveGoal = async () => {
-    const trimmedTitle = newGoalTitle.trim();
-
-    if (!trimmedTitle) {
-      Alert.alert("Goal Title Required", "Please enter a name for your savings goal.");
+    if (isSubmittingGoalRef.current) {
       return;
     }
-
-    const parsedResult = parseCurrencyToCents(newGoalTarget, currencyCode);
-    if (!parsedResult) {
-      Alert.alert("Invalid Target", "Please enter a valid positive target amount.");
-      return;
-    }
-
-    if (parsedResult.error) {
-      Alert.alert("Invalid Target", parsedResult.error);
-      return;
-    }
+    isSubmittingGoalRef.current = true;
 
     try {
+      const trimmedTitle = newGoalTitle.trim();
+
+      if (!trimmedTitle) {
+        Alert.alert("Goal Title Required", "Please enter a name for your savings goal.");
+        return;
+      }
+
+      const parsedResult = parseCurrencyToCents(newGoalTarget, currencyCode);
+      if (!parsedResult) {
+        Alert.alert("Invalid Target", "Please enter a valid positive target amount.");
+        return;
+      }
+
+      if (parsedResult.error) {
+        Alert.alert("Invalid Target", parsedResult.error);
+        return;
+      }
+
       setIsSubmittingGoal(true);
       const targetCents = parsedResult.cents;
       await createGoal({
@@ -251,6 +256,7 @@ export default function GoalsHomeScreen() {
     } catch (err) {
       Alert.alert("Error", err instanceof Error ? err.message : "Failed to create goal");
     } finally {
+      isSubmittingGoalRef.current = false;
       setIsSubmittingGoal(false);
     }
   };

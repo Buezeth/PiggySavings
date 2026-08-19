@@ -78,8 +78,9 @@ export default function InsightsScreen() {
 
   React.useEffect(() => {
     let isMounted = true;
+    setPrimaryGoalContributions30DCents(0);
+
     if (!primaryGoalId) {
-      setPrimaryGoalContributions30DCents(0);
       return;
     }
 
@@ -297,17 +298,14 @@ export default function InsightsScreen() {
                 Weekly Challenge
               </Text>
             </View>
-            <Text className="text-white text-xs font-bold">In Progress</Text>
+            <Text className="text-white text-xs font-bold">Coming Soon</Text>
           </View>
           <Text className="text-white text-lg font-black mt-1 mb-1">
             Zero Takeout Weekend 🍱
           </Text>
-          <Text className="text-white-overlay-80 text-xs font-bold leading-4 mb-3">
+          <Text className="text-white-overlay-80 text-xs font-bold leading-4 mb-1">
             Cook at home this weekend to boost your auto-allocation to your active goals!
           </Text>
-          <View className="h-2.5 bg-white-overlay-20 rounded-full overflow-hidden">
-            <View className="h-full bg-white rounded-full w-[70%]" />
-          </View>
         </CartoonCard>
       </ScrollView>
     </View>

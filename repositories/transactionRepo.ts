@@ -164,7 +164,7 @@ export async function insertTransaction(
         [
           scheduleId,
           recurringSchedule.category_id,
-          recurringSchedule.title,
+          recurringSchedule.title.trim(),
           recurringSchedule.type,
           roundedScheduleCents,
           recurringSchedule.frequency,

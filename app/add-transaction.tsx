@@ -1,10 +1,13 @@
 import CartoonCard from "@/components/CartoonCard";
 import { colors } from "@/constants/theme";
+import { useApp } from "@/context/AppContext";
+import { RecurringFrequency } from "@/services/db/types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,10 +18,8 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "@/context/AppContext";
-import { RecurringFrequency } from "@/services/db/types";
 
-import { parseCurrencyToCents, getCurrency } from "@/constants/currencies";
+import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -46,8 +47,11 @@ export default function AddTransactionModal() {
   // Recurring Schedule State
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
+  const [isNoteFocused, setIsNoteFocused] = useState(false);
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<TextInput>(null);
 
   const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
 
@@ -64,6 +68,18 @@ export default function AddTransactionModal() {
       setSelectedCategoryId(null);
     }
   }, [matchingCategories]);
+
+  // Listen for keyboard dismiss (e.g. Android back/down arrow or iOS dismiss) to reset headroom
+  React.useEffect(() => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      noteInputRef.current?.blur();
+      setIsNoteFocused(false);
+    });
+
+    return () => {
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleSave = async () => {
     if (isSubmittingRef.current) {
@@ -83,7 +99,11 @@ export default function AddTransactionModal() {
 
     const amountInCents = parsedResult.cents;
 
-    const categoryId = selectedCategoryId || (type === "income" ? "cat_salary" : "cat_dining");
+    if (!selectedCategoryId) {
+      Alert.alert("Category Required", "Select a category before you save this transaction.");
+      return;
+    }
+    const categoryId = selectedCategoryId;
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
     const transactionDate = new Date().toISOString();
@@ -103,22 +123,23 @@ export default function AddTransactionModal() {
           transaction_date: transactionDate,
           idempotency_key: idempotencyKey,
         },
-        selectedGoalId
+        type === "income" && selectedGoalId
           ? {
-              goal_id: selectedGoalId,
-              amount_cents: amountInCents,
-              note: note.trim() || "Auto-allocated from quick transaction",
-            }
+            goal_id: selectedGoalId,
+            amount_cents: amountInCents,
+            note: note.trim() || "Auto-allocated from quick transaction",
+          }
           : undefined,
         isRecurring
           ? {
-              category_id: categoryId,
-              title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
-              type,
-              amount_cents: amountInCents,
-              frequency,
-              start_date: transactionDate,
-            }
+            category_id: categoryId,
+            title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
+            type,
+            amount_cents: amountInCents,
+            frequency: frequency === "biweekly" ? "custom" : frequency,
+            custom_interval_days: frequency === "biweekly" ? 15 : undefined,
+            start_date: transactionDate,
+          }
           : undefined
       );
 
@@ -134,13 +155,12 @@ export default function AddTransactionModal() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-bg-app"
     >
       <View
         style={{
           paddingTop: Math.max(insets.top, 16),
-          paddingBottom: Math.max(insets.bottom, 16),
         }}
         className="flex-1 px-6"
       >
@@ -159,22 +179,27 @@ export default function AddTransactionModal() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            paddingBottom: Math.max(insets.bottom, 16) + (isNoteFocused ? 280 : 32),
+          }}
+        >
           {/* Income vs Expense Tactile Segmented Switch */}
           <View className="flex-row bg-bg-card p-1.5 rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark mb-5">
             <TouchableOpacity
               onPress={() => setType("income")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
-                type === "income"
-                  ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
-                  : "bg-transparent"
-              }`}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "income"
+                ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
+                : "bg-transparent"
+                }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${
-                  type === "income" ? "text-white" : "text-text-muted"
-                }`}
+                className={`will-change-variable text-xs font-black ${type === "income" ? "text-white" : "text-text-muted"
+                  }`}
               >
                 + Income / Funding
               </Text>
@@ -183,16 +208,14 @@ export default function AddTransactionModal() {
             <TouchableOpacity
               onPress={() => setType("expense")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
-                type === "expense"
-                  ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
-                  : "bg-transparent"
-              }`}
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "expense"
+                ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
+                : "bg-transparent"
+                }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${
-                  type === "expense" ? "text-white" : "text-text-muted"
-                }`}
+                className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
+                  }`}
               >
                 - Expense / Spent
               </Text>
@@ -209,9 +232,8 @@ export default function AddTransactionModal() {
             </Text>
             <View className="flex-row items-center justify-center">
               <Text
-                className={`text-3xl font-black mr-1 ${
-                  type === "income" ? "text-emerald" : "text-rose"
-                }`}
+                className={`text-3xl font-black mr-1 ${type === "income" ? "text-emerald" : "text-rose"
+                  }`}
               >
                 {type === "income" ? `+${currencySymbol.trim()}` : `-${currencySymbol.trim()}`}
               </Text>
@@ -222,9 +244,8 @@ export default function AddTransactionModal() {
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className={`text-4xl font-black flex-1 ${
-                  type === "income" ? "text-emerald" : "text-rose"
-                }`}
+                className={`text-4xl font-black flex-1 ${type === "income" ? "text-emerald" : "text-rose"
+                  }`}
               />
             </View>
             {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
@@ -248,16 +269,14 @@ export default function AddTransactionModal() {
                   key={c.id}
                   activeOpacity={0.8}
                   onPress={() => setSelectedCategoryId(c.id)}
-                  className={`will-change-variable px-3 py-2 rounded-2xl border-2 ${
-                    isSelected
-                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                  }`}
+                  className={`will-change-variable px-3 py-2 rounded-2xl border-2 ${isSelected
+                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                    }`}
                 >
                   <Text
-                    className={`text-xs font-black ${
-                      isSelected ? "text-primary" : "text-text-main"
-                    }`}
+                    className={`text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                      }`}
                   >
                     {c.name}
                   </Text>
@@ -266,53 +285,53 @@ export default function AddTransactionModal() {
             })}
           </View>
 
-          {/* Goal Allocation Selector (Optional) */}
-          <Text className="text-text-main text-sm font-black mb-2">
-            Target Goal Auto-Allocation (Optional)
-          </Text>
-          <View className="flex-row flex-wrap gap-2 mb-5">
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => setSelectedGoalId(null)}
-              className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
-                selectedGoalId === null
-                  ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                  : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-              }`}
-            >
-              <Text
-                className={`text-xs font-black ${
-                  selectedGoalId === null ? "text-primary" : "text-text-muted"
-                }`}
-              >
-                None
+          {/* Goal Allocation Selector (Optional - Income Only) */}
+          {type === "income" && (
+            <>
+              <Text className="text-text-main text-sm font-black mb-2">
+                Target Goal Auto-Allocation (Optional)
               </Text>
-            </TouchableOpacity>
-
-            {goals.map((g) => {
-              const isSelected = selectedGoalId === g.id;
-              return (
+              <View className="flex-row flex-wrap gap-2 mb-5">
                 <TouchableOpacity
-                  key={g.id}
                   activeOpacity={0.8}
-                  onPress={() => setSelectedGoalId(g.id)}
-                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
-                    isSelected
-                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                  }`}
+                  onPress={() => setSelectedGoalId(null)}
+                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${selectedGoalId === null
+                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                    }`}
                 >
                   <Text
-                    className={`text-xs font-black ${
-                      isSelected ? "text-primary" : "text-text-main"
-                    }`}
+                    className={`text-xs font-black ${selectedGoalId === null ? "text-primary" : "text-text-muted"
+                      }`}
                   >
-                    🎯 {g.title}
+                    None
                   </Text>
                 </TouchableOpacity>
-              );
-            })}
-          </View>
+
+                {goals.map((g) => {
+                  const isSelected = selectedGoalId === g.id;
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedGoalId(g.id)}
+                      className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${isSelected
+                        ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                        : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                        }`}
+                    >
+                      <Text
+                        className={`text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
+                          }`}
+                      >
+                        🎯 {g.title}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           {/* Description / Note */}
           <Text className="text-text-main text-sm font-black mb-2">
@@ -320,8 +339,18 @@ export default function AddTransactionModal() {
           </Text>
           <CartoonCard className="mb-5 p-3.5">
             <TextInput
+              ref={noteInputRef}
               value={note}
               onChangeText={setNote}
+              onFocus={() => {
+                setIsNoteFocused(true);
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollTo({ y: 260, animated: true });
+                }, 100);
+              }}
+              onBlur={() => {
+                setIsNoteFocused(false);
+              }}
               placeholder="e.g., Paycheck, Client Deposit, Groceries..."
               placeholderTextColor={colors.textMuted}
               className="text-sm text-text-main font-semibold"
@@ -369,16 +398,14 @@ export default function AddTransactionModal() {
                     <TouchableOpacity
                       key={item.id}
                       onPress={() => setFrequency(item.id)}
-                      className={`px-3 py-1.5 rounded-full border ${
-                        frequency === item.id
-                          ? "bg-primary border-primary-dark"
-                          : "bg-bg-app border-border-card"
-                      }`}
+                      className={`px-3 py-1.5 rounded-full border ${frequency === item.id
+                        ? "bg-primary border-primary-dark"
+                        : "bg-bg-app border-border-card"
+                        }`}
                     >
                       <Text
-                        className={`text-xs font-black ${
-                          frequency === item.id ? "text-white" : "text-text-muted"
-                        }`}
+                        className={`text-xs font-black ${frequency === item.id ? "text-white" : "text-text-muted"
+                          }`}
                       >
                         {item.label}
                       </Text>
