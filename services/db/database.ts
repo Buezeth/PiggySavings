@@ -1,8 +1,9 @@
 import * as SQLite from "expo-sqlite";
 import { Platform } from "react-native";
+import { CategoryRow } from "./types";
 
 export const DB_NAME = "piggysavings.db";
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -173,12 +174,14 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
           id TEXT PRIMARY KEY NOT NULL,
           goal_id TEXT NOT NULL,
           category_id TEXT,
+          schedule_id TEXT,
           rule_type TEXT NOT NULL CHECK(rule_type IN ('percentage', 'fixed_cents', 'remainder')),
           value REAL NOT NULL,
           min_income_cents INTEGER NOT NULL DEFAULT 0,
           is_active INTEGER NOT NULL DEFAULT 1,
           FOREIGN KEY (goal_id) REFERENCES goals (id) ON DELETE CASCADE,
-          FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
+          FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL,
+          FOREIGN KEY (schedule_id) REFERENCES recurring_schedules (id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS user_entitlements (
@@ -193,8 +196,54 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         CREATE INDEX IF NOT EXISTS idx_contributions_goal ON goal_contributions (goal_id);
         CREATE INDEX IF NOT EXISTS idx_recurring_next ON recurring_schedules (next_occurrence, is_active);
         CREATE INDEX IF NOT EXISTS idx_allocation_active ON allocation_rules (is_active);
+        CREATE INDEX IF NOT EXISTS idx_allocation_schedule ON allocation_rules (schedule_id);
         CREATE INDEX IF NOT EXISTS idx_goals_status ON goals (status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_type ON categories (name, type);
       `);
+
+      // Incremental Migration for existing Version 1 databases
+      if (currentVersion === 1) {
+        // 1. Safely add schedule_id column to allocation_rules if missing
+        try {
+          await txn.execAsync(`
+            ALTER TABLE allocation_rules ADD COLUMN schedule_id TEXT REFERENCES recurring_schedules (id) ON DELETE CASCADE;
+          `);
+        } catch {
+          // Column might already exist
+        }
+        await txn.execAsync(`
+          CREATE INDEX IF NOT EXISTS idx_allocation_schedule ON allocation_rules (schedule_id);
+        `);
+
+        // 2. Explicit deduplication policy before creating UNIQUE index:
+        // Merge duplicate custom categories (is_default=0) into the oldest/default category of the same name & type
+        const duplicates = await txn.getAllAsync<{ name: string; type: string; count: number }>(`
+          SELECT name, type, COUNT(*) as count FROM categories GROUP BY name, type HAVING count > 1;
+        `);
+
+        for (const dup of duplicates) {
+          const matching = await txn.getAllAsync<CategoryRow>(
+            `SELECT * FROM categories WHERE name = ? AND type = ? ORDER BY is_default DESC, rowid ASC;`,
+            [dup.name, dup.type]
+          );
+
+          if (matching.length > 1) {
+            const canonical = matching[0];
+            const duplicateIds = matching.slice(1).map((c) => c.id);
+
+            for (const dupId of duplicateIds) {
+              await txn.runAsync(`UPDATE transactions SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`UPDATE recurring_schedules SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`UPDATE allocation_rules SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`DELETE FROM categories WHERE id = ?;`, [dupId]);
+            }
+          }
+        }
+
+        await txn.execAsync(`
+          CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_type ON categories (name, type);
+        `);
+      }
 
       await txn.execAsync(`PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
     });

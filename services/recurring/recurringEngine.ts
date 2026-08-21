@@ -89,13 +89,24 @@ export function calculateNextOccurrence(
 }
 
 /**
+ * Returns today's date formatted as YYYY-MM-DD using the device's local calendar time.
+ */
+export function getLocalTodayStr(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Checks and executes all due recurring transactions and scheduled savings rules.
  * Runs atomically inside an exclusive transaction.
  */
 export async function processDueRecurringSchedules(): Promise<ProcessedScheduleResult[]> {
   const db = await getDatabase();
   const results: ProcessedScheduleResult[] = [];
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getLocalTodayStr();
 
   await runInExclusiveTransaction(db, async (txn) => {
     // 1. Query recurring_schedules where next_occurrence <= today and is_active = 1
@@ -199,4 +210,15 @@ export async function processDueRecurringSchedules(): Promise<ProcessedScheduleR
   });
 
   return results;
+}
+
+/**
+ * Clamps custom recurring days string/number to the inclusive 1–365 range.
+ * Defaults to 15 if missing, NaN, or non-positive.
+ */
+export function parseClampedCustomDays(input: string | number | null | undefined, fallback = 15): number {
+  if (input === null || input === undefined) return fallback;
+  const parsed = typeof input === "number" ? input : parseInt(input, 10);
+  if (isNaN(parsed) || parsed < 1) return fallback;
+  return Math.min(365, parsed);
 }

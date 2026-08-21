@@ -7,6 +7,7 @@ import {
   RecurringScheduleRow,
 } from "../services/db/types";
 import { CreateRecurringScheduleInput } from "./recurringRepo";
+import { calculateNextOccurrence, getLocalTodayStr } from "../services/recurring/recurringEngine";
 
 export interface InsertTransactionInput {
   id?: string;
@@ -142,8 +143,30 @@ export async function insertTransaction(
     }
     // 3. If recurring schedule specified, insert recurring schedule atomically
     if (recurringSchedule && scheduleId) {
-      const nextOccurrence =
-        recurringSchedule.next_occurrence ?? recurringSchedule.start_date;
+      const dateOnly = (recurringSchedule.start_date || txDate || getLocalTodayStr()).split("T")[0];
+
+      // Validate start_date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateOnly) || isNaN(new Date(`${dateOnly}T12:00:00Z`).getTime())) {
+        throw new Error(`Invalid recurring schedule start date: "${recurringSchedule.start_date}". Expected YYYY-MM-DD.`);
+      }
+
+      // Advance to the NEXT occurrence since today's transaction is already being recorded now
+      const rawNextOccurrence =
+        recurringSchedule.next_occurrence ??
+        calculateNextOccurrence(
+          dateOnly,
+          recurringSchedule.frequency,
+          recurringSchedule.custom_interval_days,
+          recurringSchedule.day_of_month,
+          dateOnly
+        );
+      const nextOccurrence = rawNextOccurrence.split("T")[0];
+
+      if (!dateRegex.test(nextOccurrence) || isNaN(new Date(`${nextOccurrence}T12:00:00Z`).getTime())) {
+        throw new Error(`Invalid recurring schedule next occurrence date: "${rawNextOccurrence}". Expected YYYY-MM-DD.`);
+      }
+
       const isActive = recurringSchedule.is_active ?? 1;
       const roundedScheduleCents = Math.round(recurringSchedule.amount_cents);
 
@@ -171,12 +194,30 @@ export async function insertTransaction(
           recurringSchedule.frequency,
           recurringSchedule.custom_interval_days ?? null,
           recurringSchedule.day_of_month ?? null,
-          recurringSchedule.start_date,
+          dateOnly,
           nextOccurrence,
           isActive,
           now,
         ]
       );
+
+      // Link auto-allocation rule if goal was selected for recurring income
+      if (goalAllocation && goalAllocation.goal_id && recurringSchedule.type === "income") {
+        const ruleId = Crypto.randomUUID();
+        await txn.runAsync(
+          `INSERT INTO allocation_rules (
+            id, goal_id, category_id, schedule_id, rule_type, value, min_income_cents, is_active
+          ) VALUES (?, ?, ?, ?, 'fixed_cents', ?, 0, ?);`,
+          [
+            ruleId,
+            goalAllocation.goal_id,
+            recurringSchedule.category_id,
+            scheduleId,
+            Math.round(goalAllocation.amount_cents),
+            isActive,
+          ]
+        );
+      }
     }
   });
 

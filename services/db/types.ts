@@ -77,6 +77,7 @@ export interface AllocationRuleRow {
   id: string;
   goal_id: string;
   category_id: string | null;
+  schedule_id?: string | null;
   rule_type: AllocationRuleType;
   value: number;
   min_income_cents: number;

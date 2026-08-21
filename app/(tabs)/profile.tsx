@@ -1,8 +1,11 @@
 import CartoonCard from "@/components/CartoonCard";
 import { TipJarModal } from "@/components/TipJarModal";
 import { CurrencyPickerModal } from "@/components/CurrencyPickerModal";
+import { RecurringScheduleModal } from "@/components/RecurringScheduleModal";
+import { CategoryManagerModal } from "@/components/CategoryManagerModal";
 import { colors } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
+import { RecurringScheduleRow } from "@/services/db/types";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
 import {
@@ -18,6 +21,7 @@ export default function ProfileScreen() {
   const {
     entitlements,
     recurringSchedules,
+    categories,
     currencyCode,
     currencySymbol,
     setPreferredCurrency,
@@ -33,8 +37,26 @@ export default function ProfileScreen() {
   const [isNotificationsAvailable, setIsNotificationsAvailable] = useState(false);
   const [isTipJarVisible, setIsTipJarVisible] = useState(false);
   const [isCurrencyPickerVisible, setIsCurrencyPickerVisible] = useState(false);
+  const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [isCategoryManagerVisible, setIsCategoryManagerVisible] = useState(false);
+  const [scheduleToEdit, setScheduleToEdit] = useState<RecurringScheduleRow | null>(null);
   const isSettingCurrencyRef = useRef(false);
   const isMutatingRecurringRef = useRef(false);
+
+  const getFrequencyLabel = (schedule: RecurringScheduleRow) => {
+    if (schedule.frequency === "custom") {
+      return schedule.custom_interval_days && schedule.custom_interval_days > 0
+        ? `Every ${schedule.custom_interval_days} days`
+        : "Custom Interval";
+    }
+    if (schedule.frequency === "biweekly") return "Every 2 weeks";
+    if (schedule.frequency === "weekly") return "Weekly";
+    if (schedule.frequency === "monthly") {
+      return schedule.day_of_month ? `Monthly (Day ${schedule.day_of_month})` : "Monthly";
+    }
+    if (schedule.frequency === "daily") return "Daily";
+    return schedule.frequency;
+  };
 
   const handleSelectCurrency = async (code: string) => {
     if (isSettingCurrencyRef.current) return;
@@ -281,16 +303,41 @@ export default function ProfileScreen() {
         </CartoonCard>
 
         {/* ─── RECURRING SCHEDULES MANAGER ─── */}
-        <Text className="text-text-main text-lg font-black tracking-tight mb-3">
-          Recurring Schedules Manager 🔄
-        </Text>
+        <View className="flex-row items-center justify-between mb-3">
+          <Text className="text-text-main text-lg font-black tracking-tight">
+            Recurring Schedules Manager 🔄
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setScheduleToEdit(null);
+              setIsScheduleModalVisible(true);
+            }}
+            className="flex-row items-center bg-coral-subtle px-3 py-1.5 rounded-full border border-border-card"
+          >
+            <Ionicons name="add" size={16} color={colors.primary} />
+            <Text className="text-primary text-xs font-black ml-1">
+              Add Schedule
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <CartoonCard className="mb-6 p-4">
           {recurringSchedules.length === 0 ? (
-            <View className="py-2 items-center">
-              <Text className="text-text-muted text-xs font-bold text-center">
-                No active recurring schedules found. Toggle &quot;Schedule as Recurring&quot; when logging a paycheck or expense!
+            <View className="py-3 items-center">
+              <Text className="text-text-muted text-xs font-bold text-center mb-2">
+                No recurring schedules yet. Tap &quot;Add Schedule&quot; or toggle &quot;Schedule as Recurring&quot; when logging transactions!
               </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setScheduleToEdit(null);
+                  setIsScheduleModalVisible(true);
+                }}
+                className="bg-primary px-4 py-2 rounded-xl border border-primary-light"
+              >
+                <Text className="text-white text-xs font-black">
+                  + Create First Schedule
+                </Text>
+              </TouchableOpacity>
             </View>
           ) : (
             recurringSchedules.map((schedule, index) => {
@@ -319,7 +366,20 @@ export default function ProfileScreen() {
                         {schedule.title}
                       </Text>
                       <Text className="text-text-muted text-xs font-bold mt-0.5">
-                        {formatMoney(schedule.amount_cents)} • {schedule.frequency}
+                        {formatMoney(schedule.amount_cents)} • {getFrequencyLabel(schedule)} • Next: {(() => {
+                          if (!schedule.next_occurrence) return "N/A";
+                          const parts = schedule.next_occurrence.split("-");
+                          if (parts.length === 3) {
+                            const year = parseInt(parts[0], 10);
+                            const month = parseInt(parts[1], 10) - 1;
+                            const day = parseInt(parts[2], 10);
+                            const d = new Date(year, month, day);
+                            if (!isNaN(d.getTime())) {
+                              return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+                            }
+                          }
+                          return schedule.next_occurrence;
+                        })()}
                       </Text>
                     </View>
                   </View>
@@ -332,10 +392,25 @@ export default function ProfileScreen() {
                       thumbColor={colors.white}
                     />
                     <TouchableOpacity
-                      onPress={() => handleDeleteRecurring(schedule.id, schedule.title)}
-                      className="p-1"
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setScheduleToEdit(schedule);
+                        setIsScheduleModalVisible(true);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit schedule ${schedule.title}`}
+                      className="p-1.5 rounded-lg bg-bg-app border border-border-card"
                     >
-                      <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+                      <Ionicons name="pencil" size={14} color={colors.textMain} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => handleDeleteRecurring(schedule.id, schedule.title)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete schedule ${schedule.title}`}
+                      className="p-1.5 rounded-lg bg-bg-app border border-border-card"
+                    >
+                      <Ionicons name="trash-outline" size={14} color={colors.rose} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -399,6 +474,35 @@ export default function ProfileScreen() {
         </Text>
 
         <CartoonCard className="mb-6 p-4">
+          {/* Manage Categories Row */}
+          <TouchableOpacity
+            onPress={() => setIsCategoryManagerVisible(true)}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between py-3 border-b border-bg-app"
+          >
+            <View className="flex-row items-center flex-1 mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
+                <Ionicons name="pricetags-outline" size={20} color={colors.primary} />
+              </View>
+              <View>
+                <Text className="text-text-main text-sm font-black">
+                  Manage Categories
+                </Text>
+                <Text className="text-text-muted text-xs font-bold mt-0.5">
+                  {categories.length} total categories
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center">
+              <View className="bg-coral-subtle px-2.5 py-1 rounded-full border border-border-card mr-1">
+                <Text className="text-primary text-xs font-black">
+                  Configure
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+
           {/* Preferred Currency Selector */}
           <TouchableOpacity
             onPress={() => setIsCurrencyPickerVisible(true)}
@@ -494,6 +598,22 @@ export default function ProfileScreen() {
         onClose={() => setIsCurrencyPickerVisible(false)}
         selectedCurrencyCode={currencyCode}
         onSelectCurrency={handleSelectCurrency}
+      />
+
+      {/* ─── RECURRING SCHEDULE MODAL ─── */}
+      <RecurringScheduleModal
+        visible={isScheduleModalVisible}
+        onClose={() => {
+          setIsScheduleModalVisible(false);
+          setScheduleToEdit(null);
+        }}
+        scheduleToEdit={scheduleToEdit}
+      />
+
+      {/* ─── CATEGORY MANAGER MODAL ─── */}
+      <CategoryManagerModal
+        visible={isCategoryManagerVisible}
+        onClose={() => setIsCategoryManagerVisible(false)}
       />
     </View>
   );

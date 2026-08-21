@@ -65,12 +65,11 @@ export async function evaluateAutoAllocations(
 
     query += `
       ORDER BY 
-        CASE r.type
+        CASE r.rule_type
           WHEN 'fixed_cents' THEN 1
           WHEN 'percentage' THEN 2
           ELSE 3
         END ASC,
-        r.created_at ASC,
         r.id ASC;
     `;
 
