@@ -206,7 +206,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         // 1. Safely add schedule_id column to allocation_rules if missing
         try {
           await txn.execAsync(`
-            ALTER TABLE allocation_rules ADD COLUMN schedule_id TEXT;
+            ALTER TABLE allocation_rules ADD COLUMN schedule_id TEXT REFERENCES recurring_schedules (id) ON DELETE CASCADE;
           `);
         } catch {
           // Column might already exist

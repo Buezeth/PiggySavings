@@ -145,6 +145,12 @@ export async function insertTransaction(
     if (recurringSchedule && scheduleId) {
       const dateOnly = (recurringSchedule.start_date || txDate || getLocalTodayStr()).split("T")[0];
 
+      // Validate start_date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(dateOnly) || isNaN(new Date(`${dateOnly}T12:00:00Z`).getTime())) {
+        throw new Error(`Invalid recurring schedule start date: "${recurringSchedule.start_date}". Expected YYYY-MM-DD.`);
+      }
+
       // Advance to the NEXT occurrence since today's transaction is already being recorded now
       const rawNextOccurrence =
         recurringSchedule.next_occurrence ??
@@ -156,6 +162,10 @@ export async function insertTransaction(
           dateOnly
         );
       const nextOccurrence = rawNextOccurrence.split("T")[0];
+
+      if (!dateRegex.test(nextOccurrence) || isNaN(new Date(`${nextOccurrence}T12:00:00Z`).getTime())) {
+        throw new Error(`Invalid recurring schedule next occurrence date: "${rawNextOccurrence}". Expected YYYY-MM-DD.`);
+      }
 
       const isActive = recurringSchedule.is_active ?? 1;
       const roundedScheduleCents = Math.round(recurringSchedule.amount_cents);
