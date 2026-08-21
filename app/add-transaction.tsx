@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
+import { getLocalTodayStr } from "@/services/recurring/recurringEngine";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -36,7 +37,7 @@ const generateUUIDv4 = (): string => {
 export default function AddTransactionModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { goals, categories, currencyCode, currencySymbol, addTransaction, createRecurringSchedule } = useApp();
+  const { goals, categories, currencyCode, currencySymbol, addTransaction } = useApp();
 
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
@@ -44,9 +45,12 @@ export default function AddTransactionModal() {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  // Recurring Schedule State
+  // Detailed Recurring Schedule State (matches RecurringScheduleModal)
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
+  const [customDays, setCustomDays] = useState("15");
+  const [dayOfMonth, setDayOfMonth] = useState(String(new Date().getDate()));
+
   const [isNoteFocused, setIsNoteFocused] = useState(false);
   const isSubmittingRef = useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,7 +73,7 @@ export default function AddTransactionModal() {
     }
   }, [matchingCategories]);
 
-  // Listen for keyboard dismiss (e.g. Android back/down arrow or iOS dismiss) to reset headroom
+  // Listen for keyboard dismiss to reset scroll headroom
   React.useEffect(() => {
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
       noteInputRef.current?.blur();
@@ -110,15 +114,24 @@ export default function AddTransactionModal() {
       return;
     }
 
+    const customDaysNum = frequency === "custom" ? parseInt(customDays, 10) || 15 : null;
+    const parsedDayOfMonth = parseInt(dayOfMonth, 10);
+    const dayOfMonthNum =
+      frequency === "monthly"
+        ? !isNaN(parsedDayOfMonth) && parsedDayOfMonth >= 1 && parsedDayOfMonth <= 31
+          ? parsedDayOfMonth
+          : 1
+        : null;
+
     const idempotencyKey = generateUUIDv4();
     const transactionId = generateUUIDv4();
-    const transactionDate = new Date().toISOString();
+    const transactionDate = getLocalTodayStr();
 
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
-      // Insert Transaction with optional goal contribution and recurring schedule atomically (ACID)
+      // Insert Transaction with optional goal contribution and detailed recurring schedule atomically (ACID)
       await addTransaction(
         {
           id: transactionId,
@@ -143,8 +156,9 @@ export default function AddTransactionModal() {
             title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
             type,
             amount_cents: amountInCents,
-            frequency: frequency === "biweekly" ? "custom" : frequency,
-            custom_interval_days: frequency === "biweekly" ? 15 : undefined,
+            frequency,
+            custom_interval_days: customDaysNum,
+            day_of_month: dayOfMonthNum,
             start_date: transactionDate,
           }
           : undefined
@@ -200,8 +214,8 @@ export default function AddTransactionModal() {
               onPress={() => setType("income")}
               activeOpacity={0.8}
               className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "income"
-                ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
-                : "bg-transparent"
+                  ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
+                  : "bg-transparent"
                 }`}
             >
               <Text
@@ -216,8 +230,8 @@ export default function AddTransactionModal() {
               onPress={() => setType("expense")}
               activeOpacity={0.8}
               className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "expense"
-                ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
-                : "bg-transparent"
+                  ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
+                  : "bg-transparent"
                 }`}
             >
               <Text
@@ -277,8 +291,8 @@ export default function AddTransactionModal() {
                   activeOpacity={0.8}
                   onPress={() => setSelectedCategoryId(c.id)}
                   className={`will-change-variable px-3 py-2 rounded-2xl border-2 ${isSelected
-                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
                     }`}
                 >
                   <Text
@@ -303,8 +317,8 @@ export default function AddTransactionModal() {
                   activeOpacity={0.8}
                   onPress={() => setSelectedGoalId(null)}
                   className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${selectedGoalId === null
-                    ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                    : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
                     }`}
                 >
                   <Text
@@ -323,8 +337,8 @@ export default function AddTransactionModal() {
                       activeOpacity={0.8}
                       onPress={() => setSelectedGoalId(g.id)}
                       className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${isSelected
-                        ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
-                        : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                          ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                          : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
                         }`}
                     >
                       <Text
@@ -364,7 +378,7 @@ export default function AddTransactionModal() {
             />
           </CartoonCard>
 
-          {/* Schedule as Recurring Toggle */}
+          {/* Schedule as Recurring Detailed Settings Card */}
           <CartoonCard className="mb-6 p-4">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center flex-1 mr-2">
@@ -388,37 +402,68 @@ export default function AddTransactionModal() {
               />
             </View>
 
-            {/* Recurring Frequency options */}
+            {/* Detailed Recurring Frequency & Interval Pickers */}
             {isRecurring && (
               <View className="mt-3 pt-3 border-t border-border-card">
                 <Text className="text-text-muted text-xs font-bold uppercase mb-2">
                   Frequency Interval
                 </Text>
-                <View className="flex-row gap-2">
-                  {(
-                    [
-                      { id: "weekly", label: "Weekly" },
-                      { id: "biweekly", label: "Every 15 Days" },
-                      { id: "monthly", label: "Monthly" },
-                    ] as const
-                  ).map((item) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      onPress={() => setFrequency(item.id)}
-                      className={`will-change-variable px-3 py-1.5 rounded-full border ${frequency === item.id
-                        ? "bg-primary border-primary-dark"
-                        : "bg-bg-app border-border-card"
-                        }`}
-                    >
-                      <Text
-                        className={`will-change-variable text-xs font-black ${frequency === item.id ? "text-white" : "text-text-muted"
+                <View className="flex-row flex-wrap gap-2 mb-3">
+                  {[
+                    { id: "weekly", label: "Weekly" },
+                    { id: "biweekly", label: "Every 2 Weeks" },
+                    { id: "monthly", label: "Monthly" },
+                    { id: "custom", label: "Custom Days" },
+                  ].map((item) => {
+                    const isSelected = frequency === item.id;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        onPress={() => setFrequency(item.id as RecurringFrequency)}
+                        className={`will-change-variable px-3 py-1.5 rounded-2xl border-2 ${isSelected
+                            ? "bg-primary border-primary-light border-b-4 border-b-primary-dark"
+                            : "bg-bg-app border-border-card border-b-4 border-b-border-card-dark"
                           }`}
                       >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          className={`will-change-variable text-xs font-black ${isSelected ? "text-white" : "text-text-main"
+                            }`}
+                        >
+                          {item.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
+
+                {/* Day of Month picker when Monthly is selected */}
+                {frequency === "monthly" && (
+                  <View className="flex-row items-center bg-bg-app rounded-2xl px-4 py-2.5 border-2 border-border-card border-b-4 border-b-border-card-dark">
+                    <Text className="text-text-muted text-xs font-bold mr-2">Day of Month:</Text>
+                    <TextInput
+                      value={dayOfMonth}
+                      onChangeText={setDayOfMonth}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      className="bg-bg-card px-3 py-1 rounded-xl text-text-main font-black text-sm border border-border-card w-16 text-center"
+                    />
+                    <Text className="text-text-muted text-[11px] font-bold ml-2">(1–31)</Text>
+                  </View>
+                )}
+
+                {/* Custom interval repeat input when Custom Days is selected */}
+                {frequency === "custom" && (
+                  <View className="flex-row items-center bg-bg-app rounded-2xl px-4 py-2.5 border-2 border-border-card border-b-4 border-b-border-card-dark">
+                    <Text className="text-text-muted text-xs font-bold mr-2">Repeat every</Text>
+                    <TextInput
+                      value={customDays}
+                      onChangeText={setCustomDays}
+                      keyboardType="number-pad"
+                      className="bg-bg-card px-3 py-1 rounded-xl text-text-main font-black text-sm border border-border-card w-16 text-center"
+                    />
+                    <Text className="text-text-muted text-xs font-bold ml-2">days</Text>
+                  </View>
+                )}
               </View>
             )}
           </CartoonCard>
@@ -439,5 +484,3 @@ export default function AddTransactionModal() {
     </KeyboardAvoidingView>
   );
 }
-
-

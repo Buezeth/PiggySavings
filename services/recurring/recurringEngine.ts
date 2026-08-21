@@ -89,13 +89,24 @@ export function calculateNextOccurrence(
 }
 
 /**
+ * Returns today's date formatted as YYYY-MM-DD using the device's local calendar time.
+ */
+export function getLocalTodayStr(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Checks and executes all due recurring transactions and scheduled savings rules.
  * Runs atomically inside an exclusive transaction.
  */
 export async function processDueRecurringSchedules(): Promise<ProcessedScheduleResult[]> {
   const db = await getDatabase();
   const results: ProcessedScheduleResult[] = [];
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = getLocalTodayStr();
 
   await runInExclusiveTransaction(db, async (txn) => {
     // 1. Query recurring_schedules where next_occurrence <= today and is_active = 1

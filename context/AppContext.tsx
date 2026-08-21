@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import {
   DEFAULT_CURRENCY_CODE,
   formatCurrencyCents,
@@ -30,11 +31,14 @@ import {
 } from "../repositories/goalRepo";
 import {
   CreateRecurringScheduleInput,
+  UpdateRecurringScheduleInput,
   createRecurringSchedule as createRecurringScheduleInRepo,
+  updateRecurringSchedule as updateRecurringScheduleInRepo,
   deleteRecurringSchedule as deleteRecurringScheduleInRepo,
   getRecurringSchedules,
   toggleRecurringSchedule as toggleRecurringScheduleInRepo,
 } from "../repositories/recurringRepo";
+import { processDueRecurringSchedules } from "../services/recurring/recurringEngine";
 import {
   CashflowSummary,
   EnrichedTransactionRow,
@@ -102,6 +106,7 @@ interface AppContextType {
   toggleRecurring: (id: string, isActive?: boolean) => Promise<void>;
   deleteRecurring: (id: string) => Promise<void>;
   createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
+  updateRecurringSchedule: (id: string, input: UpdateRecurringScheduleInput) => Promise<RecurringScheduleRow | null>;
 }
 
 const createDefaultPreferences = (): UserPreferenceRow => ({
@@ -337,6 +342,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   /**
+   * Update an existing recurring schedule.
+   */
+  const updateRecurring = useCallback(
+    async (id: string, input: UpdateRecurringScheduleInput) => {
+      recurringMutationRevisionRef.current += 1;
+      const updated = await updateRecurringScheduleInRepo(id, input);
+      if (updated) {
+        setRecurringSchedules((prev) =>
+          prev.map((s) => (s.id === id ? updated : s))
+        );
+      }
+      return updated;
+    },
+    []
+  );
+
+  /**
    * Create a new recurring schedule.
    */
   const createRecurringSchedule = useCallback(
@@ -348,6 +370,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     },
     []
   );
+
+  /**
+   * Foreground listener to automatically process due recurring transactions and refresh UI state
+   */
+  const isProcessingForegroundRef = useRef(false);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      async (state: AppStateStatus) => {
+        if (state === "active" && !isProcessingForegroundRef.current) {
+          isProcessingForegroundRef.current = true;
+          try {
+            const processed = await processDueRecurringSchedules();
+            if (processed && processed.length > 0) {
+              await refreshData();
+            }
+          } catch (err) {
+            console.error("Foreground recurring schedule processing error:", err);
+          } finally {
+            isProcessingForegroundRef.current = false;
+          }
+        }
+      }
+    );
+    return () => subscription.remove();
+  }, [refreshData]);
 
   /**
    * Fetch goal contributions for a specific goal.
@@ -405,6 +454,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleRecurring,
       deleteRecurring,
       createRecurringSchedule,
+      updateRecurringSchedule: updateRecurring,
     }),
     [
       goals,
@@ -433,6 +483,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       toggleRecurring,
       deleteRecurring,
       createRecurringSchedule,
+      updateRecurring,
     ]
   );
 

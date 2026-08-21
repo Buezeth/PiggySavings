@@ -10,7 +10,6 @@ import { AppProvider } from "../context/AppContext";
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
-  const isProcessingRecurringRef = useRef(false);
 
   const prepare = useCallback(async () => {
     try {
@@ -30,29 +29,6 @@ export default function RootLayout() {
   useEffect(() => {
     prepare();
   }, [prepare]);
-
-  // Hook into AppState changes to process recurring schedules when returning to foreground
-  useEffect(() => {
-    const subscription = AppState.addEventListener(
-      "change",
-      (nextAppState: AppStateStatus) => {
-        if (nextAppState === "active" && isReady && !isProcessingRecurringRef.current) {
-          isProcessingRecurringRef.current = true;
-          processDueRecurringSchedules()
-            .catch((err) => {
-              console.error("Background recurring schedules processing error:", err);
-            })
-            .finally(() => {
-              isProcessingRecurringRef.current = false;
-            });
-        }
-      }
-    );
-
-    return () => {
-      subscription.remove();
-    };
-  }, [isReady]);
 
   if (initError) {
     return (
