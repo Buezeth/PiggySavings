@@ -371,7 +371,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   >
                     <Ionicons name="add" size={12} color={colors.rose} />
                     <Text className="text-rose-dark text-[11px] font-black ml-1">
-                      + Expense
+                      Expense
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -405,7 +405,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   >
                     <Ionicons name="add" size={12} color={colors.emerald} />
                     <Text className="text-emerald-dark text-[11px] font-black ml-1">
-                      + Income
+                      Income
                     </Text>
                   </TouchableOpacity>
                 </View>

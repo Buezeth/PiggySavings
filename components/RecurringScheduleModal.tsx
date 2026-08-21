@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrency, parseCurrencyToCents } from "../constants/currencies";
+import { PALETTE_CONFIG, PaletteToken } from "../constants/iconRegistry";
 import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
 import { RecurringFrequency, RecurringScheduleRow } from "../services/db/types";
@@ -354,18 +355,61 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
               <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row gap-2 py-1">
                 {matchingCategories.map((cat) => {
                   const isSelected = selectedCategoryId === cat.id;
+                  const paletteToken = (cat.color_code as PaletteToken) || (type === "income" ? "emerald" : "primary");
+                  const palette = PALETTE_CONFIG[paletteToken] || PALETTE_CONFIG.primary;
+
                   return (
                     <TouchableOpacity
                       key={cat.id}
+                      activeOpacity={0.8}
                       onPress={() => setSelectedCategoryId(cat.id)}
-                      className={`will-change-variable mr-2 px-3.5 py-2.5 rounded-2xl items-center justify-center border-2 ${isSelected
-                          ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                      className={`will-change-variable mr-2 flex-row items-center px-3.5 py-2 rounded-2xl border-2 ${
+                        isSelected
+                          ? `${palette.bgSubtleClass} ${palette.borderClass}`
                           : "bg-bg-app border-border-card border-b-4 border-b-border-card-dark"
-                        }`}
+                      }`}
                     >
+                      {cat.icon_name && (
+                        <View className="mr-1.5">
+                          {cat.icon_family === "MaterialCommunityIcons" ? (
+                            <MaterialCommunityIcons
+                              name={cat.icon_name as any}
+                              size={15}
+                              color={
+                                isSelected
+                                  ? paletteToken === "emerald"
+                                    ? colors.emerald
+                                    : paletteToken === "rose"
+                                    ? colors.rose
+                                    : paletteToken === "gold"
+                                    ? colors.goldDark
+                                    : colors.primary
+                                  : colors.textMuted
+                              }
+                            />
+                          ) : (
+                            <Ionicons
+                              name={cat.icon_name as any}
+                              size={15}
+                              color={
+                                isSelected
+                                  ? paletteToken === "emerald"
+                                    ? colors.emerald
+                                    : paletteToken === "rose"
+                                    ? colors.rose
+                                    : paletteToken === "gold"
+                                    ? colors.goldDark
+                                    : colors.primary
+                                  : colors.textMuted
+                              }
+                            />
+                          )}
+                        </View>
+                      )}
                       <Text
-                        className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
-                          }`}
+                        className={`will-change-variable text-xs font-black ${
+                          isSelected ? palette.textClass : "text-text-main"
+                        }`}
                       >
                         {cat.name}
                       </Text>

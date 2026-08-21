@@ -379,33 +379,6 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => {
-                      setType("expense");
-                      if (selectedPalette === "emerald") {
-                        setSelectedPalette("primary");
-                      }
-                    }}
-                    className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "expense"
-                        ? "bg-rose border-rose-light border-b-rose-dark"
-                        : "bg-transparent border-transparent border-b-transparent"
-                      }`}
-                  >
-                    <Ionicons
-                      name="arrow-down-circle"
-                      size={18}
-                      color={type === "expense" ? colors.white : colors.textMuted}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
-                        }`}
-                    >
-                      Expense
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
                       setType("income");
                       if (selectedPalette === "primary" || selectedPalette === "rose") {
                         setSelectedPalette("emerald");
@@ -427,6 +400,33 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         }`}
                     >
                       Income
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setType("expense");
+                      if (selectedPalette === "emerald") {
+                        setSelectedPalette("primary");
+                      }
+                    }}
+                    className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "expense"
+                        ? "bg-rose border-rose-light border-b-rose-dark"
+                        : "bg-transparent border-transparent border-b-transparent"
+                      }`}
+                  >
+                    <Ionicons
+                      name="arrow-down-circle"
+                      size={18}
+                      color={type === "expense" ? colors.white : colors.textMuted}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
+                        }`}
+                    >
+                      Expense
                     </Text>
                   </TouchableOpacity>
                 </View>
