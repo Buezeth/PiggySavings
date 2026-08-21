@@ -15,6 +15,7 @@ import { PALETTE_CONFIG, PaletteToken } from "../constants/iconRegistry";
 import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
 import {
+  CategoryUsageCount,
   getAllCategoryUsageCounts,
   getCategoryUsageCount,
 } from "../repositories/categoryRepo";
@@ -35,7 +36,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const { categories, deleteCategory, refreshData } = useApp();
 
   const [usageCounts, setUsageCounts] = useState<
-    Record<string, { transactionCount: number; scheduleCount: number }>
+    Record<string, CategoryUsageCount>
   >({});
 
   const [isFormModalVisible, setIsFormModalVisible] = useState(false);
@@ -95,7 +96,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 
     try {
       const counts = await getCategoryUsageCount(category.id);
-      const totalUsage = counts.transactionCount + counts.scheduleCount;
+      const totalUsage = counts.transactionCount + counts.scheduleCount + counts.allocationCount;
 
       if (totalUsage === 0) {
         Alert.alert(
@@ -161,7 +162,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       (category.color_code as PaletteToken) ||
       (category.type === "income" ? "emerald" : "primary");
     const palette = PALETTE_CONFIG[paletteToken] || PALETTE_CONFIG.primary;
-    const counts = usageCounts[category.id] ?? { transactionCount: 0, scheduleCount: 0 };
+    const counts = usageCounts[category.id] ?? { transactionCount: 0, scheduleCount: 0, allocationCount: 0 };
 
     return (
       <View
@@ -208,6 +209,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               {counts.transactionCount === 1 ? "" : "s"}
               {counts.scheduleCount > 0 &&
                 ` • ${counts.scheduleCount} recurring`}
+              {counts.allocationCount > 0 &&
+                ` • ${counts.allocationCount} rule${counts.allocationCount === 1 ? "" : "s"}`}
             </Text>
           </View>
         </View>

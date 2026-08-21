@@ -146,7 +146,7 @@ export async function insertTransaction(
       const dateOnly = (recurringSchedule.start_date || txDate || getLocalTodayStr()).split("T")[0];
 
       // Advance to the NEXT occurrence since today's transaction is already being recorded now
-      const nextOccurrence =
+      const rawNextOccurrence =
         recurringSchedule.next_occurrence ??
         calculateNextOccurrence(
           dateOnly,
@@ -155,6 +155,7 @@ export async function insertTransaction(
           recurringSchedule.day_of_month,
           dateOnly
         );
+      const nextOccurrence = rawNextOccurrence.split("T")[0];
 
       const isActive = recurringSchedule.is_active ?? 1;
       const roundedScheduleCents = Math.round(recurringSchedule.amount_cents);
@@ -196,13 +197,14 @@ export async function insertTransaction(
         await txn.runAsync(
           `INSERT INTO allocation_rules (
             id, goal_id, category_id, schedule_id, rule_type, value, min_income_cents, is_active
-          ) VALUES (?, ?, ?, ?, 'fixed_cents', ?, 0, 1);`,
+          ) VALUES (?, ?, ?, ?, 'fixed_cents', ?, 0, ?);`,
           [
             ruleId,
             goalAllocation.goal_id,
             recurringSchedule.category_id,
             scheduleId,
             Math.round(goalAllocation.amount_cents),
+            isActive,
           ]
         );
       }

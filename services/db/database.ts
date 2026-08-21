@@ -1,5 +1,6 @@
 import * as SQLite from "expo-sqlite";
 import { Platform } from "react-native";
+import { CategoryRow } from "./types";
 
 export const DB_NAME = "piggysavings.db";
 export const CURRENT_SCHEMA_VERSION = 2;
@@ -202,6 +203,7 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
 
       // Incremental Migration for existing Version 1 databases
       if (currentVersion === 1) {
+        // 1. Safely add schedule_id column to allocation_rules if missing
         try {
           await txn.execAsync(`
             ALTER TABLE allocation_rules ADD COLUMN schedule_id TEXT;
@@ -211,6 +213,34 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
         }
         await txn.execAsync(`
           CREATE INDEX IF NOT EXISTS idx_allocation_schedule ON allocation_rules (schedule_id);
+        `);
+
+        // 2. Explicit deduplication policy before creating UNIQUE index:
+        // Merge duplicate custom categories (is_default=0) into the oldest/default category of the same name & type
+        const duplicates = await txn.getAllAsync<{ name: string; type: string; count: number }>(`
+          SELECT name, type, COUNT(*) as count FROM categories GROUP BY name, type HAVING count > 1;
+        `);
+
+        for (const dup of duplicates) {
+          const matching = await txn.getAllAsync<CategoryRow>(
+            `SELECT * FROM categories WHERE name = ? AND type = ? ORDER BY is_default DESC, rowid ASC;`,
+            [dup.name, dup.type]
+          );
+
+          if (matching.length > 1) {
+            const canonical = matching[0];
+            const duplicateIds = matching.slice(1).map((c) => c.id);
+
+            for (const dupId of duplicateIds) {
+              await txn.runAsync(`UPDATE transactions SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`UPDATE recurring_schedules SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`UPDATE allocation_rules SET category_id = ? WHERE category_id = ?;`, [canonical.id, dupId]);
+              await txn.runAsync(`DELETE FROM categories WHERE id = ?;`, [dupId]);
+            }
+          }
+        }
+
+        await txn.execAsync(`
           CREATE UNIQUE INDEX IF NOT EXISTS idx_categories_name_type ON categories (name, type);
         `);
       }
