@@ -1,5 +1,32 @@
-import { getDatabase } from "../services/db/database";
+import * as Crypto from "expo-crypto";
+import { getDatabase, runInExclusiveTransaction } from "../services/db/database";
 import { CategoryRow } from "../services/db/types";
+
+export interface CreateCategoryInput {
+  name: string;
+  type: "income" | "expense";
+  icon_name?: string | null;
+  icon_family?: string | null;
+  color_code?: string | null;
+}
+
+export interface UpdateCategoryInput {
+  name?: string;
+  type?: "income" | "expense";
+  icon_name?: string | null;
+  icon_family?: string | null;
+  color_code?: string | null;
+}
+
+export interface CategoryUsageCount {
+  transactionCount: number;
+  scheduleCount: number;
+}
+
+export interface DeleteCategoryResult {
+  success: boolean;
+  reassignedCount: number;
+}
 
 /**
  * Fetch all categories ordered by default first, then alphabetically by name.
@@ -24,4 +51,249 @@ export async function getCategoriesByType(
     [type]
   );
   return rows;
+}
+
+/**
+ * Fetch a single category by ID.
+ */
+export async function getCategoryById(id: string): Promise<CategoryRow | null> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<CategoryRow>(
+    `SELECT * FROM categories WHERE id = ?;`,
+    [id]
+  );
+  return row ?? null;
+}
+
+/**
+ * Creates a custom category (is_default = 0, generates UUID v4 ID).
+ */
+export async function createCustomCategory(
+  input: CreateCategoryInput
+): Promise<CategoryRow> {
+  const db = await getDatabase();
+  const id = `cat_${Crypto.randomUUID()}`;
+  const name = input.name.trim();
+
+  if (!name) {
+    throw new Error("Category name cannot be empty.");
+  }
+
+  await db.runAsync(
+    `INSERT INTO categories (id, name, type, icon_name, icon_family, color_code, is_default)
+     VALUES (?, ?, ?, ?, ?, ?, 0);`,
+    [
+      id,
+      name,
+      input.type,
+      input.icon_name ?? null,
+      input.icon_family ?? null,
+      input.color_code ?? null,
+    ]
+  );
+
+  const created = await getCategoryById(id);
+  if (!created) {
+    throw new Error(`Failed to create category with ID: ${id}`);
+  }
+  return created;
+}
+
+/**
+ * Updates a category's fields. Rejects modification of system defaults (is_default = 1).
+ */
+export async function updateCategory(
+  id: string,
+  fields: UpdateCategoryInput
+): Promise<CategoryRow | null> {
+  const db = await getDatabase();
+  const existing = await getCategoryById(id);
+
+  if (!existing) {
+    throw new Error(`Category with ID "${id}" does not exist.`);
+  }
+
+  if (existing.is_default === 1) {
+    throw new Error("System default categories cannot be modified.");
+  }
+
+  const setClauses: string[] = [];
+  const values: (string | number | null)[] = [];
+
+  if (fields.name !== undefined) {
+    const trimmed = fields.name.trim();
+    if (!trimmed) {
+      throw new Error("Category name cannot be empty.");
+    }
+    setClauses.push("name = ?");
+    values.push(trimmed);
+  }
+  if (fields.type !== undefined) {
+    setClauses.push("type = ?");
+    values.push(fields.type);
+  }
+  if (fields.icon_name !== undefined) {
+    setClauses.push("icon_name = ?");
+    values.push(fields.icon_name);
+  }
+  if (fields.icon_family !== undefined) {
+    setClauses.push("icon_family = ?");
+    values.push(fields.icon_family);
+  }
+  if (fields.color_code !== undefined) {
+    setClauses.push("color_code = ?");
+    values.push(fields.color_code);
+  }
+
+  if (setClauses.length === 0) {
+    return existing;
+  }
+
+  values.push(id);
+  await db.runAsync(
+    `UPDATE categories SET ${setClauses.join(", ")} WHERE id = ?;`,
+    values
+  );
+
+  return getCategoryById(id);
+}
+
+/**
+ * High-performance batch aggregation of transaction and schedule counts for all categories.
+ * Replaces N parallel queries with 2 grouped queries.
+ */
+export async function getAllCategoryUsageCounts(): Promise<
+  Record<string, CategoryUsageCount>
+> {
+  const db = await getDatabase();
+  const txRows = await db.getAllAsync<{ category_id: string; count: number }>(
+    `SELECT category_id, COUNT(*) as count FROM transactions GROUP BY category_id;`
+  );
+  const schedRows = await db.getAllAsync<{ category_id: string; count: number }>(
+    `SELECT category_id, COUNT(*) as count FROM recurring_schedules GROUP BY category_id;`
+  );
+
+  const result: Record<string, CategoryUsageCount> = {};
+  for (const row of txRows) {
+    if (!result[row.category_id]) {
+      result[row.category_id] = { transactionCount: 0, scheduleCount: 0 };
+    }
+    result[row.category_id].transactionCount = row.count;
+  }
+  for (const row of schedRows) {
+    if (!result[row.category_id]) {
+      result[row.category_id] = { transactionCount: 0, scheduleCount: 0 };
+    }
+    result[row.category_id].scheduleCount = row.count;
+  }
+  return result;
+}
+
+/**
+ * Returns the count of transactions and recurring schedules referencing a single category.
+ */
+export async function getCategoryUsageCount(
+  id: string
+): Promise<CategoryUsageCount> {
+  const db = await getDatabase();
+
+  const txRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM transactions WHERE category_id = ?;`,
+    [id]
+  );
+  const schedRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM recurring_schedules WHERE category_id = ?;`,
+    [id]
+  );
+
+  return {
+    transactionCount: txRow?.count ?? 0,
+    scheduleCount: schedRow?.count ?? 0,
+  };
+}
+
+/**
+ * Deletes a category with foreign key safeguards and atomic record migration.
+ */
+export async function deleteCategory(
+  id: string,
+  reassignToCategoryId?: string
+): Promise<DeleteCategoryResult> {
+  const db = await getDatabase();
+  const existing = await getCategoryById(id);
+
+  if (!existing) {
+    throw new Error(`Category with ID "${id}" does not exist.`);
+  }
+
+  if (existing.is_default === 1) {
+    throw new Error("System default categories cannot be deleted.");
+  }
+
+  if (reassignToCategoryId) {
+    if (reassignToCategoryId === id) {
+      throw new Error("Cannot reassign category to itself.");
+    }
+    const targetCategory = await getCategoryById(reassignToCategoryId);
+    if (!targetCategory) {
+      throw new Error(
+        `Target category for reassignment "${reassignToCategoryId}" does not exist.`
+      );
+    }
+  }
+
+  return await runInExclusiveTransaction(db, async (txn) => {
+    let reassignedCount = 0;
+
+    if (reassignToCategoryId) {
+      const txResult = await txn.runAsync(
+        `UPDATE transactions SET category_id = ? WHERE category_id = ?;`,
+        [reassignToCategoryId, id]
+      );
+      const schedResult = await txn.runAsync(
+        `UPDATE recurring_schedules SET category_id = ? WHERE category_id = ?;`,
+        [reassignToCategoryId, id]
+      );
+      const allocResult = await txn.runAsync(
+        `UPDATE allocation_rules SET category_id = ? WHERE category_id = ?;`,
+        [reassignToCategoryId, id]
+      );
+
+      reassignedCount =
+        (txResult.changes ?? 0) +
+        (schedResult.changes ?? 0) +
+        (allocResult.changes ?? 0);
+    } else {
+      const txCountRow = await txn.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM transactions WHERE category_id = ?;`,
+        [id]
+      );
+      const schedCountRow = await txn.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM recurring_schedules WHERE category_id = ?;`,
+        [id]
+      );
+
+      const totalReferences =
+        (txCountRow?.count ?? 0) + (schedCountRow?.count ?? 0);
+      if (totalReferences > 0) {
+        throw new Error(
+          `Cannot delete category "${existing.name}". It is referenced by ${txCountRow?.count ?? 0} transaction(s) and ${schedCountRow?.count ?? 0} recurring schedule(s). Please specify a category to reassign these records to.`
+        );
+      }
+    }
+
+    const deleteResult = await txn.runAsync(
+      `DELETE FROM categories WHERE id = ?;`,
+      [id]
+    );
+
+    if (deleteResult.changes === 0) {
+      throw new Error(`Failed to delete category "${id}".`);
+    }
+
+    return {
+      success: true,
+      reassignedCount,
+    };
+  });
 }

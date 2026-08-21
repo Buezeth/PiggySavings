@@ -1,7 +1,11 @@
 import CartoonCard from "@/components/CartoonCard";
+import CategoryFormModal from "@/components/CategoryFormModal";
+import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
+import { PALETTE_CONFIG, PaletteToken } from "@/constants/iconRegistry";
 import { colors } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
-import { RecurringFrequency } from "@/services/db/types";
+import { CategoryRow, RecurringFrequency } from "@/services/db/types";
+import { getLocalTodayStr } from "@/services/recurring/recurringEngine";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
@@ -18,9 +22,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
-import { getLocalTodayStr } from "@/services/recurring/recurringEngine";
 
 // Helper function to generate UUID v4 idempotency key
 const generateUUIDv4 = (): string => {
@@ -45,6 +46,9 @@ export default function AddTransactionModal() {
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
+  // Category creation modal state
+  const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
+
   // Detailed Recurring Schedule State (matches RecurringScheduleModal)
   const [isRecurring, setIsRecurring] = useState(false);
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
@@ -64,10 +68,12 @@ export default function AddTransactionModal() {
     return categories.filter((c) => c.type === type);
   }, [categories, type]);
 
-  // Set default category when type changes
+  // Set default category when type changes or preserve valid selection
   React.useEffect(() => {
     if (matchingCategories.length > 0) {
-      setSelectedCategoryId(matchingCategories[0].id);
+      if (!selectedCategoryId || !matchingCategories.some((c) => c.id === selectedCategoryId)) {
+        setSelectedCategoryId(matchingCategories[0].id);
+      }
     } else {
       setSelectedCategoryId(null);
     }
@@ -84,6 +90,13 @@ export default function AddTransactionModal() {
       hideSubscription.remove();
     };
   }, []);
+
+  const handleCategoryCreated = (newCategory: CategoryRow) => {
+    if (newCategory.type === type) {
+      setSelectedCategoryId(newCategory.id);
+    }
+    setIsCategoryModalVisible(false);
+  };
 
   const handleSave = async () => {
     if (isSubmittingRef.current) {
@@ -144,23 +157,23 @@ export default function AddTransactionModal() {
         },
         type === "income" && selectedGoalId
           ? {
-            goal_id: selectedGoalId,
-            amount_cents: amountInCents,
-            note: note.trim() || "Auto-allocated from quick transaction",
-            idempotency_key: generateUUIDv4(),
-          }
+              goal_id: selectedGoalId,
+              amount_cents: amountInCents,
+              note: note.trim() || "Auto-allocated from quick transaction",
+              idempotency_key: generateUUIDv4(),
+            }
           : undefined,
         isRecurring
           ? {
-            category_id: categoryId,
-            title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
-            type,
-            amount_cents: amountInCents,
-            frequency,
-            custom_interval_days: customDaysNum,
-            day_of_month: dayOfMonthNum,
-            start_date: transactionDate,
-          }
+              category_id: categoryId,
+              title: note.trim() || (type === "income" ? "Recurring Income" : "Recurring Expense"),
+              type,
+              amount_cents: amountInCents,
+              frequency,
+              custom_interval_days: customDaysNum,
+              day_of_month: dayOfMonthNum,
+              start_date: transactionDate,
+            }
           : undefined
       );
 
@@ -213,14 +226,16 @@ export default function AddTransactionModal() {
             <TouchableOpacity
               onPress={() => setType("income")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "income"
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
+                type === "income"
                   ? "bg-emerald border-2 border-emerald-light border-b-4 border-b-emerald-dark"
                   : "bg-transparent"
-                }`}
+              }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${type === "income" ? "text-white" : "text-text-muted"
-                  }`}
+                className={`will-change-variable text-xs font-black ${
+                  type === "income" ? "text-white" : "text-text-muted"
+                }`}
               >
                 + Income / Funding
               </Text>
@@ -229,14 +244,16 @@ export default function AddTransactionModal() {
             <TouchableOpacity
               onPress={() => setType("expense")}
               activeOpacity={0.8}
-              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${type === "expense"
+              className={`will-change-variable flex-1 py-3 rounded-2xl items-center justify-center ${
+                type === "expense"
                   ? "bg-rose border-2 border-rose-light border-b-4 border-b-rose-dark"
                   : "bg-transparent"
-                }`}
+              }`}
             >
               <Text
-                className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
-                  }`}
+                className={`will-change-variable text-xs font-black ${
+                  type === "expense" ? "text-white" : "text-text-muted"
+                }`}
               >
                 - Expense / Spent
               </Text>
@@ -253,8 +270,9 @@ export default function AddTransactionModal() {
             </Text>
             <View className="flex-row items-center justify-center">
               <Text
-                className={`will-change-variable text-3xl font-black mr-1 ${type === "income" ? "text-emerald" : "text-rose"
-                  }`}
+                className={`will-change-variable text-3xl font-black mr-1 ${
+                  type === "income" ? "text-emerald" : "text-rose"
+                }`}
               >
                 {type === "income" ? `+${currencySymbol.trim()}` : `-${currencySymbol.trim()}`}
               </Text>
@@ -265,8 +283,9 @@ export default function AddTransactionModal() {
                 placeholderTextColor={colors.textMuted}
                 keyboardType="decimal-pad"
                 style={{ textAlign: "center" }}
-                className={`will-change-variable text-4xl font-black flex-1 ${type === "income" ? "text-emerald" : "text-rose"
-                  }`}
+                className={`will-change-variable text-4xl font-black flex-1 ${
+                  type === "income" ? "text-emerald" : "text-rose"
+                }`}
               />
             </View>
             {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
@@ -285,25 +304,79 @@ export default function AddTransactionModal() {
           <View className="flex-row flex-wrap gap-2 mb-5">
             {matchingCategories.map((c) => {
               const isSelected = selectedCategoryId === c.id;
+              const paletteToken = (c.color_code as PaletteToken) || (type === "income" ? "emerald" : "primary");
+              const palette = PALETTE_CONFIG[paletteToken] || PALETTE_CONFIG.primary;
+
               return (
                 <TouchableOpacity
                   key={c.id}
                   activeOpacity={0.8}
                   onPress={() => setSelectedCategoryId(c.id)}
-                  className={`will-change-variable px-3 py-2 rounded-2xl border-2 ${isSelected
-                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                  className={`will-change-variable flex-row items-center px-3.5 py-2 rounded-2xl border-2 ${
+                    isSelected
+                      ? `${palette.bgSubtleClass} ${palette.borderClass}`
                       : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                    }`}
+                  }`}
                 >
+                  {c.icon_name && (
+                    <View className="mr-1.5">
+                      {c.icon_family === "MaterialCommunityIcons" ? (
+                        <MaterialCommunityIcons
+                          name={c.icon_name as any}
+                          size={15}
+                          color={
+                            isSelected
+                              ? paletteToken === "emerald"
+                                ? colors.emerald
+                                : paletteToken === "rose"
+                                ? colors.rose
+                                : paletteToken === "gold"
+                                ? colors.goldDark
+                                : colors.primary
+                              : colors.textMuted
+                          }
+                        />
+                      ) : (
+                        <Ionicons
+                          name={c.icon_name as any}
+                          size={15}
+                          color={
+                            isSelected
+                              ? paletteToken === "emerald"
+                                ? colors.emerald
+                                : paletteToken === "rose"
+                                ? colors.rose
+                                : paletteToken === "gold"
+                                ? colors.goldDark
+                                : colors.primary
+                              : colors.textMuted
+                          }
+                        />
+                      )}
+                    </View>
+                  )}
                   <Text
-                    className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
-                      }`}
+                    className={`will-change-variable text-xs font-black ${
+                      isSelected ? palette.textClass : "text-text-main"
+                    }`}
                   >
                     {c.name}
                   </Text>
                 </TouchableOpacity>
               );
             })}
+
+            {/* Inline + New Category Chip */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsCategoryModalVisible(true)}
+              className="will-change-variable flex-row items-center px-3.5 py-2 rounded-2xl bg-coral-subtle border-2 border-dashed border-primary-light border-b-4 border-b-primary-dark"
+            >
+              <Ionicons name="add-circle" size={15} color={colors.primary} />
+              <Text className="text-primary text-xs font-black ml-1.5">
+                New Category
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Goal Allocation Selector (Optional - Income Only) */}
@@ -316,14 +389,16 @@ export default function AddTransactionModal() {
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setSelectedGoalId(null)}
-                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${selectedGoalId === null
+                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
+                    selectedGoalId === null
                       ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
                       : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                    }`}
+                  }`}
                 >
                   <Text
-                    className={`will-change-variable text-xs font-black ${selectedGoalId === null ? "text-primary" : "text-text-muted"
-                      }`}
+                    className={`will-change-variable text-xs font-black ${
+                      selectedGoalId === null ? "text-primary" : "text-text-muted"
+                    }`}
                   >
                     None
                   </Text>
@@ -336,14 +411,16 @@ export default function AddTransactionModal() {
                       key={g.id}
                       activeOpacity={0.8}
                       onPress={() => setSelectedGoalId(g.id)}
-                      className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${isSelected
+                      className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
+                        isSelected
                           ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
                           : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
-                        }`}
+                      }`}
                     >
                       <Text
-                        className={`will-change-variable text-xs font-black ${isSelected ? "text-primary" : "text-text-main"
-                          }`}
+                        className={`will-change-variable text-xs font-black ${
+                          isSelected ? "text-primary" : "text-text-main"
+                        }`}
                       >
                         🎯 {g.title}
                       </Text>
@@ -420,14 +497,16 @@ export default function AddTransactionModal() {
                       <TouchableOpacity
                         key={item.id}
                         onPress={() => setFrequency(item.id as RecurringFrequency)}
-                        className={`will-change-variable px-3 py-1.5 rounded-2xl border-2 ${isSelected
+                        className={`will-change-variable px-3 py-1.5 rounded-2xl border-2 ${
+                          isSelected
                             ? "bg-primary border-primary-light border-b-4 border-b-primary-dark"
                             : "bg-bg-app border-border-card border-b-4 border-b-border-card-dark"
-                          }`}
+                        }`}
                       >
                         <Text
-                          className={`will-change-variable text-xs font-black ${isSelected ? "text-white" : "text-text-main"
-                            }`}
+                          className={`will-change-variable text-xs font-black ${
+                            isSelected ? "text-white" : "text-text-main"
+                          }`}
                         >
                           {item.label}
                         </Text>
@@ -481,6 +560,14 @@ export default function AddTransactionModal() {
           </TouchableOpacity>
         </ScrollView>
       </View>
+
+      {/* Category Creation Modal */}
+      <CategoryFormModal
+        visible={isCategoryModalVisible}
+        onClose={() => setIsCategoryModalVisible(false)}
+        defaultType={type}
+        onSuccess={handleCategoryCreated}
+      />
     </KeyboardAvoidingView>
   );
 }

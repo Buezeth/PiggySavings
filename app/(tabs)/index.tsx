@@ -1,11 +1,14 @@
 import CartoonCard from "@/components/CartoonCard";
 import { GoalLimitModal } from "@/components/GoalLimitModal";
 import Hero from "@/components/Hero";
+import { IconPickerModal } from "@/components/IconPickerModal";
 import { TipJarModal } from "@/components/TipJarModal";
+import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
+import { getIconById, ICON_REGISTRY, IconDefinition } from "@/constants/iconRegistry";
 import { colors } from "@/constants/theme";
-import { parseCurrencyToCents, getCurrency } from "@/constants/currencies";
 import { useApp } from "@/context/AppContext";
 import { HeroData, TimePeriod } from "@/data/homeData";
+import { CardVariant } from "@/services/db/types";
 import { canCreateNewGoal } from "@/services/monetization/entitlementGuard";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -23,6 +26,56 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+interface CardVariantOption {
+  id: CardVariant;
+  label: string;
+  bgClass: string;
+  borderClass: string;
+  textClass: string;
+}
+
+const CARD_VARIANTS: CardVariantOption[] = [
+  {
+    id: "card",
+    label: "Classic",
+    bgClass: "bg-bg-card",
+    borderClass: "border-border-card border-b-border-card-dark",
+    textClass: "text-text-main",
+  },
+  {
+    id: "subtle",
+    label: "Coral",
+    bgClass: "bg-coral-subtle",
+    borderClass: "border-primary-light border-b-primary-dark",
+    textClass: "text-primary",
+  },
+  {
+    id: "gold",
+    label: "Gold",
+    bgClass: "bg-gold-subtle",
+    borderClass: "border-gold-border border-b-gold-border-dark",
+    textClass: "text-gold-dark",
+  },
+  {
+    id: "income",
+    label: "Emerald",
+    bgClass: "bg-emerald-subtle",
+    borderClass: "border-emerald-border border-b-emerald-border-dark",
+    textClass: "text-emerald-dark",
+  },
+];
+
+const TAG_SUGGESTIONS = [
+  "🎯 Savings",
+  "✈️ Travel",
+  "💻 Tech",
+  "🛡️ Emergency",
+  "🏠 Home",
+  "🎓 Education",
+  "🚗 Vehicle",
+  "💍 Special",
+];
+
 export default function GoalsHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -38,11 +91,16 @@ export default function GoalsHomeScreen() {
     maxLimit: 3,
   });
 
-  // Simple Add Goal Modal State
+  // Add Goal Modal State
   const [isAddGoalModalVisible, setIsAddGoalModalVisible] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
   const [newGoalTarget, setNewGoalTarget] = useState("");
-  const [newGoalCategory, setNewGoalCategory] = useState("Savings");
+  const [newGoalCategory, setNewGoalCategory] = useState("🎯 Savings");
+  const [newGoalCardVariant, setNewGoalCardVariant] = useState<CardVariant>("card");
+  const [selectedGoalIcon, setSelectedGoalIcon] = useState<IconDefinition>(
+    getIconById("milestones-target") || ICON_REGISTRY[0]
+  );
+  const [isIconPickerVisible, setIsIconPickerVisible] = useState(false);
   const [isSubmittingGoal, setIsSubmittingGoal] = useState(false);
   const isSubmittingGoalRef = React.useRef(false);
 
@@ -243,15 +301,18 @@ export default function GoalsHomeScreen() {
         title: trimmedTitle,
         target_amount_cents: targetCents,
         current_amount_cents: 0,
-        category_tag: newGoalCategory,
-        icon_name: "sparkles",
-        icon_family: "Ionicons",
-        card_variant: "card",
+        category_tag: newGoalCategory.trim() || "🎯 Savings",
+        icon_name: selectedGoalIcon.name,
+        icon_family: selectedGoalIcon.family,
+        card_variant: newGoalCardVariant,
         priority_label: "Active Goal",
       });
 
       setNewGoalTitle("");
       setNewGoalTarget("");
+      setNewGoalCategory("🎯 Savings");
+      setNewGoalCardVariant("card");
+      setSelectedGoalIcon(getIconById("milestones-target") || ICON_REGISTRY[0]);
       setIsAddGoalModalVisible(false);
     } catch (err) {
       Alert.alert("Error", err instanceof Error ? err.message : "Failed to create goal");
@@ -402,7 +463,7 @@ export default function GoalsHomeScreen() {
             </CartoonCard>
           ) : (
             <View className="flex-row flex-wrap gap-3 mb-6">
-              {goals.map((goal, idx) => {
+              {goals.map((goal) => {
                 const progressPercent = Math.min(
                   Math.round(
                     ((goal.current_amount_cents || 0) /
@@ -412,17 +473,41 @@ export default function GoalsHomeScreen() {
                   100
                 );
 
-                const isGold = idx % 2 === 1;
-                const cardVariant = isGold ? "gold" : "card";
-                const iconBgClass = isGold ? "bg-gold" : "bg-primary";
-                const amountTextClass = isGold ? "text-gold-dark" : "text-primary";
-                const badgeBorderClass = isGold ? "border-gold-border" : "border-border-card";
-                const progressFillClass = isGold ? "bg-gold-dark" : "bg-primary";
+                const variant = goal.card_variant || "card";
+                const isGold = variant === "gold";
+                const isIncome = variant === "income";
+                const isSubtle = variant === "subtle";
+
+                const iconBgClass = isGold
+                  ? "bg-gold"
+                  : isIncome
+                    ? "bg-emerald"
+                    : isSubtle
+                      ? "bg-bg-accent"
+                      : "bg-primary";
+
+                const amountTextClass = isGold
+                  ? "text-gold-dark"
+                  : isIncome
+                    ? "text-emerald-dark"
+                    : "text-primary";
+
+                const badgeBorderClass = isGold
+                  ? "border-gold-border"
+                  : isIncome
+                    ? "border-emerald-border"
+                    : "border-border-card";
+
+                const progressFillClass = isGold
+                  ? "bg-gold-dark"
+                  : isIncome
+                    ? "bg-emerald"
+                    : "bg-primary";
 
                 return (
                   <CartoonCard
                     key={goal.id}
-                    variant={cardVariant}
+                    variant={variant}
                     className="p-4 flex-1 min-w-[46%]"
                   >
                     <View className="flex-row items-center justify-between mb-3">
@@ -529,7 +614,7 @@ export default function GoalsHomeScreen() {
         }}
       />
 
-      {/* ─── QUICK ADD GOAL DIALOG ─── */}
+      {/* ─── ADD GOAL MODAL ─── */}
       <Modal
         visible={isAddGoalModalVisible}
         animationType="slide"
@@ -538,100 +623,219 @@ export default function GoalsHomeScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          className="flex-1"
+          className="flex-1 bg-black-overlay-60 justify-end"
         >
-          <View className="flex-1 bg-black-overlay-60 justify-end">
-            <CartoonCard
-              variant="card"
-              style={{ paddingBottom: Math.max(insets.bottom, 20) }}
-              className="rounded-t-3xl rounded-b-none p-6"
-            >
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-text-main text-lg font-black">
-                  Create Savings Goal 🎯
+          <View
+            style={{
+              maxHeight: "90%",
+              paddingBottom: Math.max(insets.bottom, 16),
+            }}
+            className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden"
+          >
+            {/* Modal Header */}
+            <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
+              <View className="flex-row items-center gap-2">
+                <View className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-2">
+                  <Ionicons name="sparkles" size={16} color={colors.primary} />
+                </View>
+                <Text className="text-text-main text-lg font-black tracking-tight">
+                  Create Savings Goal
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setIsAddGoalModalVisible(false)}
-                  className="w-8 h-8 rounded-full bg-bg-app items-center justify-center"
-                >
-                  <Ionicons name="close" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-
-              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-                Goal Name
-              </Text>
-              <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-3">
-                <TextInput
-                  value={newGoalTitle}
-                  onChangeText={setNewGoalTitle}
-                  placeholder="e.g., Japan Vacation, Studio Setup"
-                  placeholderTextColor={colors.textMuted}
-                  className="text-sm text-text-main font-bold"
-                />
-              </View>
-
-              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-                Target Amount ({currencySymbol.trim()})
-              </Text>
-              <View className="bg-bg-app rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark mb-1">
-                <TextInput
-                  value={newGoalTarget}
-                  onChangeText={setNewGoalTarget}
-                  placeholder={activeCurrency.decimal_digits === 0 ? "1000" : "1000.00"}
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="decimal-pad"
-                  className="text-sm text-text-main font-bold"
-                />
-              </View>
-              {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
-                <Text className="text-text-muted text-[11px] font-bold mb-3">
-                  {activeCurrency.rounding > 0
-                    ? `Target rounds to nearest ${activeCurrency.rounding} step`
-                    : "Zero-decimal currency"}
-                </Text>
-              )}
-              {!(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
-                <View className="mb-3" />
-              )}
-
-              <Text className="text-text-muted text-xs font-bold uppercase mb-1">
-                Category Tag
-              </Text>
-              <View className="flex-row gap-2 mb-6">
-                {["Savings", "Travel", "Tech", "Emergency"].map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    onPress={() => setNewGoalCategory(cat)}
-                    className={`px-3 py-1.5 rounded-full border ${newGoalCategory === cat
-                      ? "bg-primary border-primary-dark"
-                      : "bg-bg-app border-border-card"
-                      }`}
-                  >
-                    <Text
-                      className={`text-xs font-black ${newGoalCategory === cat ? "text-white" : "text-text-muted"
-                        }`}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
               </View>
 
               <TouchableOpacity
-                onPress={handleSaveGoal}
-                disabled={isSubmittingGoal}
-                activeOpacity={0.85}
-                className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
+                onPress={() => setIsAddGoalModalVisible(false)}
+                activeOpacity={0.7}
+                className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center"
               >
-                <Text className="text-white text-sm font-black uppercase">
-                  {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
-                </Text>
+                <Ionicons name="close" size={18} color={colors.textMuted} />
               </TouchableOpacity>
-            </CartoonCard>
+            </View>
+
+            <ScrollView
+              className="p-4 space-y-4"
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Goal Name & Icon Picker Row */}
+              <View className="mb-2">
+                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                  Goal Name & Icon
+                </Text>
+                <View className="flex-row items-center gap-3">
+                  {/* Interactive Icon Trigger Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setIsIconPickerVisible(true)}
+                    className={`will-change-variable w-14 h-14 rounded-2xl items-center justify-center border-2 border-b-4 ${newGoalCardVariant === "gold"
+                      ? "bg-gold border-gold-light border-b-gold-dark"
+                      : newGoalCardVariant === "income"
+                        ? "bg-emerald border-emerald-light border-b-emerald-dark"
+                        : newGoalCardVariant === "subtle"
+                          ? "bg-bg-accent border-primary-light border-b-primary-dark"
+                          : "bg-primary border-primary-light border-b-primary-dark"
+                      }`}
+                  >
+                    {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
+                      <MaterialCommunityIcons
+                        name={selectedGoalIcon.name as any}
+                        size={26}
+                        color={colors.white}
+                      />
+                    ) : (
+                      <Ionicons
+                        name={selectedGoalIcon.name as any}
+                        size={26}
+                        color={colors.white}
+                      />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Goal Title Input */}
+                  <View className="flex-1 bg-bg-card rounded-2xl px-3.5 py-3 border-2 border-border-card border-b-4 border-b-border-card-dark justify-center">
+                    <TextInput
+                      value={newGoalTitle}
+                      onChangeText={setNewGoalTitle}
+                      placeholder="e.g., Japan Vacation, Emergency Fund"
+                      placeholderTextColor={colors.textMuted}
+                      className="text-sm text-text-main font-black py-0"
+                      maxLength={40}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Target Amount */}
+              <View className="mb-2">
+                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                  Target Amount ({currencySymbol.trim()})
+                </Text>
+                <View className="bg-bg-card rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark">
+                  <TextInput
+                    value={newGoalTarget}
+                    onChangeText={setNewGoalTarget}
+                    placeholder={activeCurrency.decimal_digits === 0 ? "1000" : "1000.00"}
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="decimal-pad"
+                    className="text-lg text-text-main font-black py-0"
+                  />
+                </View>
+                {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+                  <Text className="text-text-muted text-[11px] font-bold mt-1">
+                    {activeCurrency.rounding > 0
+                      ? `Target rounds to nearest ${activeCurrency.rounding} step`
+                      : "Zero-decimal currency"}
+                  </Text>
+                )}
+              </View>
+
+              {/* Card Variant Selector (4 tactile swatches) */}
+              <View className="mb-2">
+                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                  Card Style Variant
+                </Text>
+                <View className="flex-row justify-between gap-2">
+                  {CARD_VARIANTS.map((v) => {
+                    const isSelected = newGoalCardVariant === v.id;
+                    return (
+                      <TouchableOpacity
+                        key={v.id}
+                        activeOpacity={0.8}
+                        onPress={() => setNewGoalCardVariant(v.id)}
+                        className={`will-change-variable flex-1 p-2.5 rounded-2xl items-center border-2 border-b-4 ${v.bgClass} ${v.borderClass} ${isSelected ? "opacity-100" : "opacity-70"
+                          }`}
+                      >
+                        <Text
+                          className={`will-change-variable text-[11px] font-black mb-1 ${v.textClass}`}
+                        >
+                          {v.label}
+                        </Text>
+                        <View
+                          className={`will-change-variable w-5 h-5 rounded-full items-center justify-center ${isSelected ? "bg-primary" : "bg-bg-app"
+                            }`}
+                        >
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={12} color={colors.white} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Category Tag Input with Suggestion Chips */}
+              <View className="mb-4">
+                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                  Category Tag
+                </Text>
+                <View className="bg-bg-card rounded-2xl px-3.5 py-2.5 border-2 border-border-card border-b-4 border-b-border-card-dark mb-2.5">
+                  <TextInput
+                    value={newGoalCategory}
+                    onChangeText={setNewGoalCategory}
+                    placeholder="e.g., ✈️ Travel, 🏠 Home"
+                    placeholderTextColor={colors.textMuted}
+                    className="text-sm text-text-main font-bold py-0"
+                    maxLength={24}
+                  />
+                </View>
+
+                {/* Preset Suggestions */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 6 }}
+                >
+                  {TAG_SUGGESTIONS.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      activeOpacity={0.75}
+                      onPress={() => setNewGoalCategory(tag)}
+                      className={`will-change-variable px-3 py-1.5 rounded-full border-2 border-b-4 ${newGoalCategory === tag
+                        ? "bg-coral-subtle border-primary-light border-b-primary-dark"
+                        : "bg-bg-card border-border-card border-b-border-card-dark"
+                        }`}
+                    >
+                      <Text
+                        className={`will-change-variable text-xs font-black ${newGoalCategory === tag ? "text-primary" : "text-text-muted"
+                          }`}
+                      >
+                        {tag}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Submit Button */}
+              <View className="pt-2 pb-6">
+                <TouchableOpacity
+                  onPress={handleSaveGoal}
+                  disabled={isSubmittingGoal}
+                  activeOpacity={0.85}
+                  className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
+                >
+                  <Text className="text-white text-sm font-black uppercase tracking-wider">
+                    {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ─── ICON PICKER MODAL FOR GOALS ─── */}
+      <IconPickerModal
+        visible={isIconPickerVisible}
+        onClose={() => setIsIconPickerVisible(false)}
+        selectedIconName={selectedGoalIcon.name}
+        onSelectIcon={(icon) => {
+          setSelectedGoalIcon(icon);
+          setIsIconPickerVisible(false);
+        }}
+        title="Choose Goal Icon"
+      />
     </View>
   );
 }

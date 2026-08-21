@@ -2,6 +2,7 @@ import CartoonCard from "@/components/CartoonCard";
 import { TipJarModal } from "@/components/TipJarModal";
 import { CurrencyPickerModal } from "@/components/CurrencyPickerModal";
 import { RecurringScheduleModal } from "@/components/RecurringScheduleModal";
+import { CategoryManagerModal } from "@/components/CategoryManagerModal";
 import { colors } from "@/constants/theme";
 import { useApp } from "@/context/AppContext";
 import { RecurringScheduleRow } from "@/services/db/types";
@@ -20,6 +21,7 @@ export default function ProfileScreen() {
   const {
     entitlements,
     recurringSchedules,
+    categories,
     currencyCode,
     currencySymbol,
     setPreferredCurrency,
@@ -36,6 +38,7 @@ export default function ProfileScreen() {
   const [isTipJarVisible, setIsTipJarVisible] = useState(false);
   const [isCurrencyPickerVisible, setIsCurrencyPickerVisible] = useState(false);
   const [isScheduleModalVisible, setIsScheduleModalVisible] = useState(false);
+  const [isCategoryManagerVisible, setIsCategoryManagerVisible] = useState(false);
   const [scheduleToEdit, setScheduleToEdit] = useState<RecurringScheduleRow | null>(null);
   const isSettingCurrencyRef = useRef(false);
   const isMutatingRecurringRef = useRef(false);
@@ -450,6 +453,35 @@ export default function ProfileScreen() {
         </Text>
 
         <CartoonCard className="mb-6 p-4">
+          {/* Manage Categories Row */}
+          <TouchableOpacity
+            onPress={() => setIsCategoryManagerVisible(true)}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between py-3 border-b border-bg-app"
+          >
+            <View className="flex-row items-center flex-1 mr-3">
+              <View className="w-10 h-10 rounded-2xl bg-coral-subtle items-center justify-center mr-3">
+                <Ionicons name="pricetags-outline" size={20} color={colors.primary} />
+              </View>
+              <View>
+                <Text className="text-text-main text-sm font-black">
+                  Manage Categories
+                </Text>
+                <Text className="text-text-muted text-xs font-bold mt-0.5">
+                  {categories.length} total categories
+                </Text>
+              </View>
+            </View>
+            <View className="flex-row items-center">
+              <View className="bg-coral-subtle px-2.5 py-1 rounded-full border border-border-card mr-1">
+                <Text className="text-primary text-xs font-black">
+                  Configure
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </View>
+          </TouchableOpacity>
+
           {/* Preferred Currency Selector */}
           <TouchableOpacity
             onPress={() => setIsCurrencyPickerVisible(true)}
@@ -555,6 +587,12 @@ export default function ProfileScreen() {
           setScheduleToEdit(null);
         }}
         scheduleToEdit={scheduleToEdit}
+      />
+
+      {/* ─── CATEGORY MANAGER MODAL ─── */}
+      <CategoryManagerModal
+        visible={isCategoryManagerVisible}
+        onClose={() => setIsCategoryManagerVisible(false)}
       />
     </View>
   );

@@ -14,7 +14,12 @@ import {
   getCurrencySymbol,
 } from "../constants/currencies";
 import {
-  getAllCategories
+  CreateCategoryInput,
+  createCustomCategory as createCustomCategoryInRepo,
+  deleteCategory as deleteCategoryInRepo,
+  getAllCategories,
+  UpdateCategoryInput,
+  updateCategory as updateCategoryInRepo,
 } from "../repositories/categoryRepo";
 import {
   getUserEntitlements,
@@ -107,6 +112,9 @@ interface AppContextType {
   deleteRecurring: (id: string) => Promise<void>;
   createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
   updateRecurringSchedule: (id: string, input: UpdateRecurringScheduleInput) => Promise<RecurringScheduleRow | null>;
+  createCategory: (input: CreateCategoryInput) => Promise<CategoryRow>;
+  updateCategory: (id: string, fields: UpdateCategoryInput) => Promise<CategoryRow | null>;
+  deleteCategory: (id: string, reassignToCategoryId?: string) => Promise<{ success: boolean; reassignedCount: number }>;
 }
 
 const createDefaultPreferences = (): UserPreferenceRow => ({
@@ -426,6 +434,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [currencyCode]
   );
 
+  /**
+   * Create a new custom category.
+   */
+  const createCategory = useCallback(
+    async (input: CreateCategoryInput): Promise<CategoryRow> => {
+      const created = await createCustomCategoryInRepo(input);
+      setCategories((prev) => [...prev, created]);
+      await refreshData();
+      return created;
+    },
+    [refreshData]
+  );
+
+  /**
+   * Update an existing custom category.
+   */
+  const updateCategory = useCallback(
+    async (id: string, fields: UpdateCategoryInput): Promise<CategoryRow | null> => {
+      const updated = await updateCategoryInRepo(id, fields);
+      if (updated) {
+        setCategories((prev) =>
+          prev.map((c) => (c.id === id ? updated : c))
+        );
+        await refreshData();
+      }
+      return updated;
+    },
+    [refreshData]
+  );
+
+  /**
+   * Delete a category with optional reassignment of associated records.
+   */
+  const deleteCategory = useCallback(
+    async (
+      id: string,
+      reassignToCategoryId?: string
+    ): Promise<{ success: boolean; reassignedCount: number }> => {
+      const result = await deleteCategoryInRepo(id, reassignToCategoryId);
+      if (result.success) {
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+        await refreshData();
+      }
+      return result;
+    },
+    [refreshData]
+  );
+
   const value = useMemo<AppContextType>(
     () => ({
       goals,
@@ -455,6 +511,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteRecurring,
       createRecurringSchedule,
       updateRecurringSchedule: updateRecurring,
+      createCategory,
+      updateCategory,
+      deleteCategory,
     }),
     [
       goals,
@@ -484,6 +543,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteRecurring,
       createRecurringSchedule,
       updateRecurring,
+      createCategory,
+      updateCategory,
+      deleteCategory,
     ]
   );
 
