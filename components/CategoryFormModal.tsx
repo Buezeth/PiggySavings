@@ -1,8 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,15 +18,14 @@ import {
   getIconById,
   ICON_REGISTRY,
   IconDefinition,
-  IconDomain,
   PALETTE_CONFIG,
   PaletteToken,
-  searchIcons,
 } from "../constants/iconRegistry";
 import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
 import { CategoryRow } from "../services/db/types";
 import { CartoonCard } from "./CartoonCard";
+import { IconPickerModal } from "./IconPickerModal";
 
 export interface CategoryFormModalProps {
   visible: boolean;
@@ -37,72 +35,7 @@ export interface CategoryFormModalProps {
   onSuccess?: (category: CategoryRow) => void;
 }
 
-interface DomainChip {
-  id: IconDomain | "all";
-  label: string;
-}
-
-const DOMAIN_CHIPS: DomainChip[] = [
-  { id: "all", label: "All" },
-  { id: "food", label: "Food" },
-  { id: "housing", label: "Home" },
-  { id: "transport", label: "Travel" },
-  { id: "lifestyle", label: "Fun" },
-  { id: "health", label: "Health" },
-  { id: "finance", label: "Finance" },
-  { id: "milestones", label: "Goals" },
-];
-
 const PALETTE_OPTIONS: PaletteToken[] = ["primary", "emerald", "gold", "rose"];
-
-interface IconGridCellProps {
-  item: IconDefinition;
-  isSelected: boolean;
-  onSelect: (icon: IconDefinition) => void;
-}
-
-// Memoized Grid Cell for Category Form
-const IconGridCell = React.memo(
-  ({ item, isSelected, onSelect }: IconGridCellProps) => {
-    return (
-      <View className="flex-1 p-1.5 items-center justify-center">
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => onSelect(item)}
-          className={`will-change-variable w-full aspect-square rounded-2xl items-center justify-center border-2 border-b-4 ${isSelected
-              ? "bg-coral-subtle border-primary-light border-b-primary-dark"
-              : "bg-bg-card border-border-card border-b-border-card-dark"
-            }`}
-        >
-          {item.family === "Ionicons" ? (
-            <Ionicons
-              name={item.name as any}
-              size={24}
-              color={isSelected ? colors.primary : colors.textMain}
-            />
-          ) : (
-            <MaterialCommunityIcons
-              name={item.name as any}
-              size={24}
-              color={isSelected ? colors.primary : colors.textMain}
-            />
-          )}
-          <Text
-            numberOfLines={1}
-            className={`will-change-variable text-[10px] font-bold mt-1 text-center px-1 ${isSelected ? "text-primary" : "text-text-muted"
-              }`}
-          >
-            {item.label}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  },
-  (prev, next) =>
-    prev.isSelected === next.isSelected && prev.item.id === next.item.id
-);
-
-IconGridCell.displayName = "IconGridCell";
 
 export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   visible,
@@ -127,18 +60,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   const [selectedIcon, setSelectedIcon] = useState<IconDefinition>(ICON_REGISTRY[0]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Stepped view: 'form' vs 'icon-picker'
-  const [viewMode, setViewMode] = useState<"form" | "icon-picker">("form");
-
-  // Icon search & filter
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedDomain, setSelectedDomain] = useState<IconDomain | "all">("all");
-
-  const filteredIcons = useMemo(() => {
-    const domainFilter = selectedDomain === "all" ? undefined : selectedDomain;
-    return searchIcons(searchQuery, domainFilter);
-  }, [searchQuery, selectedDomain]);
+  const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -171,9 +93,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         );
       }
       setError(null);
-      setViewMode("form");
-      setSearchQuery("");
-      setSelectedDomain("all");
+      setIsIconPickerOpen(false);
     }
   }, [visible, categoryToEdit, defaultType]);
 
@@ -198,7 +118,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       if (isEditing && categoryToEdit) {
         resultCategory = await updateCategory(categoryToEdit.id, {
           name: trimmedName,
-          type,
+          ...(type !== categoryToEdit.type ? { type } : {}),
           icon_name: selectedIcon.name,
           icon_family: selectedIcon.family,
           color_code: selectedPalette,
@@ -227,105 +147,53 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     }
   };
 
-  const handleSelectIconFromGrid = useCallback((icon: IconDefinition) => {
-    setSelectedIcon(icon);
-    setViewMode("form");
-  }, []);
-
-  const renderIconItem = useCallback(
-    ({ item }: { item: IconDefinition }) => {
-      const isSelected =
-        selectedIcon.id === item.id || selectedIcon.name === item.name;
-
-      return (
-        <IconGridCell
-          item={item}
-          isSelected={isSelected}
-          onSelect={handleSelectIconFromGrid}
-        />
-      );
-    },
-    [selectedIcon, handleSelectIconFromGrid]
-  );
-
-  const keyExtractor = useCallback((item: IconDefinition) => item.id, []);
-
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={() => {
-        if (viewMode === "icon-picker") {
-          setViewMode("form");
-        } else {
-          onClose();
-        }
-      }}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        className="flex-1 bg-black-overlay-60 justify-end"
+    <>
+      <Modal
+        visible={visible}
+        transparent
+        animationType="slide"
+        onRequestClose={onClose}
       >
-        <Pressable
-          className="flex-1"
-          onPress={() => {
-            if (viewMode === "icon-picker") {
-              setViewMode("form");
-            } else {
-              onClose();
-            }
-          }}
-        />
-
-        <View
-          style={{
-            height: sheetHeight,
-            paddingBottom: Math.max(insets.bottom, 16),
-          }}
-          className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          className="flex-1 bg-black-overlay-60 justify-end"
         >
-          {/* Header */}
-          <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
-            <View className="flex-row items-center gap-2">
-              {viewMode === "icon-picker" && (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => setViewMode("form")}
-                  className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-2"
-                  accessibilityLabel="Back to form"
-                >
-                  <Ionicons name="arrow-back" size={18} color={colors.textMain} />
-                </TouchableOpacity>
-              )}
-              <View className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-2">
-                <Ionicons
-                  name={viewMode === "icon-picker" ? "sparkles" : "pricetag-outline"}
-                  size={16}
-                  color={colors.primary}
-                />
+          <Pressable className="flex-1" onPress={onClose} />
+
+          <View
+            style={{
+              height: sheetHeight,
+              paddingBottom: Math.max(insets.bottom, 16),
+            }}
+            className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
+          >
+            {/* Header */}
+            <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
+              <View className="flex-row items-center gap-2">
+                <View className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-2">
+                  <Ionicons
+                    name="pricetag-outline"
+                    size={16}
+                    color={colors.primary}
+                  />
+                </View>
+                <Text className="text-text-main text-lg font-black tracking-tight">
+                  {isEditing ? "Edit Category" : "New Category"}
+                </Text>
               </View>
-              <Text className="text-text-main text-lg font-black tracking-tight">
-                {viewMode === "icon-picker"
-                  ? "Choose Category Icon"
-                  : isEditing
-                    ? "Edit Category"
-                    : "New Category"}
-              </Text>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={onClose}
+                className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center"
+                accessibilityLabel="Close category modal"
+              >
+                <Ionicons name="close" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={onClose}
-              className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center"
-              accessibilityLabel="Close category modal"
-            >
-              <Ionicons name="close" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Stepped View 1: Main Category Form */}
-          {viewMode === "form" && (
+            {/* Main Category Form */}
             <ScrollView
               className="flex-1 p-4"
               showsVerticalScrollIndicator={false}
@@ -345,13 +213,13 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                   >
                     {selectedIcon.family === "Ionicons" ? (
                       <Ionicons
-                        name={selectedIcon.name as any}
+                        name={selectedIcon.name}
                         size={22}
                         color={colors.white}
                       />
                     ) : (
                       <MaterialCommunityIcons
-                        name={selectedIcon.name as any}
+                        name={selectedIcon.name}
                         size={22}
                         color={colors.white}
                       />
@@ -486,7 +354,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </Text>
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => setViewMode("icon-picker")}
+                  onPress={() => setIsIconPickerOpen(true)}
                   className="bg-bg-card p-3 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark flex-row items-center justify-between"
                 >
                   <View className="flex-row items-center gap-3">
@@ -495,31 +363,15 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                     >
                       {selectedIcon.family === "Ionicons" ? (
                         <Ionicons
-                          name={selectedIcon.name as any}
+                          name={selectedIcon.name}
                           size={20}
-                          color={
-                            selectedPalette === "emerald"
-                              ? colors.emerald
-                              : selectedPalette === "rose"
-                                ? colors.rose
-                                : selectedPalette === "gold"
-                                  ? colors.goldDark
-                                  : colors.primary
-                          }
+                          color={activePalette.colorCode}
                         />
                       ) : (
                         <MaterialCommunityIcons
-                          name={selectedIcon.name as any}
+                          name={selectedIcon.name}
                           size={20}
-                          color={
-                            selectedPalette === "emerald"
-                              ? colors.emerald
-                              : selectedPalette === "rose"
-                                ? colors.rose
-                                : selectedPalette === "gold"
-                                  ? colors.goldDark
-                                  : colors.primary
-                          }
+                          color={activePalette.colorCode}
                         />
                       )}
                     </View>
@@ -581,115 +433,22 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </CartoonCard>
               </View>
             </ScrollView>
-          )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
-          {/* Stepped View 2: Virtualized Icon Picker */}
-          {viewMode === "icon-picker" && (
-            <View className="flex-1 flex-col">
-              {/* Search Bar */}
-              <View className="px-4 pt-3 pb-2 bg-bg-app">
-                <View className="flex-row items-center bg-bg-card rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark px-3 py-2">
-                  <Ionicons
-                    name="search"
-                    size={18}
-                    color={colors.textMuted}
-                    style={{ marginRight: 8 }}
-                  />
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search 50+ vector icons..."
-                    placeholderTextColor={colors.textMuted}
-                    className="flex-1 text-sm font-bold text-text-main py-0"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                  />
-                  {searchQuery.length > 0 && (
-                    <TouchableOpacity
-                      activeOpacity={0.7}
-                      onPress={() => setSearchQuery("")}
-                      className="p-1"
-                    >
-                      <Ionicons
-                        name="close-circle"
-                        size={16}
-                        color={colors.textMuted}
-                      />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              {/* Domain Filter Chips */}
-              <View className="py-2 bg-bg-app">
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={DOMAIN_CHIPS}
-                  keyExtractor={(item) => item.id}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
-                  renderItem={({ item }) => {
-                    const isActive = selectedDomain === item.id;
-                    return (
-                      <TouchableOpacity
-                        activeOpacity={0.75}
-                        onPress={() => setSelectedDomain(item.id)}
-                        className={`will-change-variable px-3.5 py-1.5 rounded-full mr-2 border-2 border-b-4 ${isActive
-                            ? "bg-primary border-primary-light border-b-primary-dark"
-                            : "bg-bg-card border-border-card border-b-border-card-dark"
-                          }`}
-                      >
-                        <Text
-                          className={`will-change-variable text-xs font-black ${isActive ? "text-white" : "text-text-main"
-                            }`}
-                        >
-                          {item.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-              </View>
-
-              {/* Virtualized Grid */}
-              <View className="flex-1 px-3 pt-1">
-                {filteredIcons.length === 0 ? (
-                  <View className="py-12 items-center justify-center">
-                    <Ionicons
-                      name="search-outline"
-                      size={40}
-                      color={colors.textMuted}
-                    />
-                    <Text className="text-text-main font-black text-base mt-2">
-                      No icons found
-                    </Text>
-                    <Text className="text-text-muted text-xs font-bold mt-1">
-                      Try searching with another keyword
-                    </Text>
-                  </View>
-                ) : (
-                  <FlatList
-                    data={filteredIcons}
-                    keyExtractor={keyExtractor}
-                    renderItem={renderIconItem}
-                    numColumns={4}
-                    initialNumToRender={12}
-                    maxToRenderPerBatch={12}
-                    windowSize={4}
-                    removeClippedSubviews={Platform.OS === "android"}
-                    contentContainerStyle={{
-                      paddingBottom: 24,
-                      paddingTop: 4,
-                    }}
-                    showsVerticalScrollIndicator={false}
-                  />
-                )}
-              </View>
-            </View>
-          )}
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      {/* Shared Icon Picker Modal */}
+      <IconPickerModal
+        visible={isIconPickerOpen}
+        onClose={() => setIsIconPickerOpen(false)}
+        selectedIconName={selectedIcon.name}
+        onSelectIcon={(icon) => {
+          setSelectedIcon(icon);
+          setIsIconPickerOpen(false);
+        }}
+        title="Choose Category Icon"
+      />
+    </>
   );
 };
 

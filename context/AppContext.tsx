@@ -17,6 +17,7 @@ import {
   CreateCategoryInput,
   createCustomCategory as createCustomCategoryInRepo,
   deleteCategory as deleteCategoryInRepo,
+  DeleteCategoryResult,
   getAllCategories,
   UpdateCategoryInput,
   updateCategory as updateCategoryInRepo,
@@ -114,7 +115,7 @@ interface AppContextType {
   updateRecurringSchedule: (id: string, input: UpdateRecurringScheduleInput) => Promise<RecurringScheduleRow | null>;
   createCategory: (input: CreateCategoryInput) => Promise<CategoryRow>;
   updateCategory: (id: string, fields: UpdateCategoryInput) => Promise<CategoryRow | null>;
-  deleteCategory: (id: string, reassignToCategoryId?: string) => Promise<{ success: boolean; reassignedCount: number }>;
+  deleteCategory: (id: string, reassignToCategoryId?: string) => Promise<DeleteCategoryResult>;
 }
 
 const createDefaultPreferences = (): UserPreferenceRow => ({
@@ -441,10 +442,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (input: CreateCategoryInput): Promise<CategoryRow> => {
       const created = await createCustomCategoryInRepo(input);
       setCategories((prev) => [...prev, created]);
-      await refreshData();
       return created;
     },
-    [refreshData]
+    []
   );
 
   /**
@@ -471,7 +471,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     async (
       id: string,
       reassignToCategoryId?: string
-    ): Promise<{ success: boolean; reassignedCount: number }> => {
+    ): Promise<DeleteCategoryResult> => {
       const result = await deleteCategoryInRepo(id, reassignToCategoryId);
       if (result.success) {
         setCategories((prev) => prev.filter((c) => c.id !== id));

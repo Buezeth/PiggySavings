@@ -479,30 +479,30 @@ export default function GoalsHomeScreen() {
                 const isSubtle = variant === "subtle";
 
                 const iconBgClass = isGold
-                  ? "bg-gold"
+                  ? "will-change-variable bg-gold"
                   : isIncome
-                    ? "bg-emerald"
+                    ? "will-change-variable bg-emerald"
                     : isSubtle
-                      ? "bg-bg-accent"
-                      : "bg-primary";
+                      ? "will-change-variable bg-bg-accent"
+                      : "will-change-variable bg-primary";
 
                 const amountTextClass = isGold
-                  ? "text-gold-dark"
+                  ? "will-change-variable text-gold-dark"
                   : isIncome
-                    ? "text-emerald-dark"
-                    : "text-primary";
+                    ? "will-change-variable text-emerald-dark"
+                    : "will-change-variable text-primary";
 
                 const badgeBorderClass = isGold
-                  ? "border-gold-border"
+                  ? "will-change-variable border-gold-border"
                   : isIncome
-                    ? "border-emerald-border"
-                    : "border-border-card";
+                    ? "will-change-variable border-emerald-border"
+                    : "will-change-variable border-border-card";
 
                 const progressFillClass = isGold
-                  ? "bg-gold-dark"
+                  ? "will-change-variable bg-gold-dark"
                   : isIncome
-                    ? "bg-emerald"
-                    : "bg-primary";
+                    ? "will-change-variable bg-emerald"
+                    : "will-change-variable bg-primary";
 
                 return (
                   <CartoonCard
@@ -653,10 +653,11 @@ export default function GoalsHomeScreen() {
             </View>
 
             <ScrollView
-              className="p-4 space-y-4"
+              className="p-4"
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
             >
+              <View className="gap-4">
               {/* Goal Name & Icon Picker Row */}
               <View className="mb-2">
                 <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
@@ -819,6 +820,7 @@ export default function GoalsHomeScreen() {
                     {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
                   </Text>
                 </TouchableOpacity>
+              </View>
               </View>
             </ScrollView>
           </View>

@@ -44,8 +44,10 @@ export default function ProfileScreen() {
   const isMutatingRecurringRef = useRef(false);
 
   const getFrequencyLabel = (schedule: RecurringScheduleRow) => {
-    if (schedule.frequency === "custom" && schedule.custom_interval_days) {
-      return `Every ${schedule.custom_interval_days} days`;
+    if (schedule.frequency === "custom") {
+      return schedule.custom_interval_days && schedule.custom_interval_days > 0
+        ? `Every ${schedule.custom_interval_days} days`
+        : "Custom Interval";
     }
     if (schedule.frequency === "biweekly") return "Every 2 weeks";
     if (schedule.frequency === "weekly") return "Weekly";
@@ -364,7 +366,20 @@ export default function ProfileScreen() {
                         {schedule.title}
                       </Text>
                       <Text className="text-text-muted text-xs font-bold mt-0.5">
-                        {formatMoney(schedule.amount_cents)} • {getFrequencyLabel(schedule)} • Next: {schedule.next_occurrence}
+                        {formatMoney(schedule.amount_cents)} • {getFrequencyLabel(schedule)} • Next: {(() => {
+                          if (!schedule.next_occurrence) return "N/A";
+                          const parts = schedule.next_occurrence.split("-");
+                          if (parts.length === 3) {
+                            const year = parseInt(parts[0], 10);
+                            const month = parseInt(parts[1], 10) - 1;
+                            const day = parseInt(parts[2], 10);
+                            const d = new Date(year, month, day);
+                            if (!isNaN(d.getTime())) {
+                              return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+                            }
+                          }
+                          return schedule.next_occurrence;
+                        })()}
                       </Text>
                     </View>
                   </View>
@@ -377,16 +392,22 @@ export default function ProfileScreen() {
                       thumbColor={colors.white}
                     />
                     <TouchableOpacity
+                      activeOpacity={0.7}
                       onPress={() => {
                         setScheduleToEdit(schedule);
                         setIsScheduleModalVisible(true);
                       }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit schedule ${schedule.title}`}
                       className="p-1.5 rounded-lg bg-bg-app border border-border-card"
                     >
                       <Ionicons name="pencil" size={14} color={colors.textMain} />
                     </TouchableOpacity>
                     <TouchableOpacity
+                      activeOpacity={0.7}
                       onPress={() => handleDeleteRecurring(schedule.id, schedule.title)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete schedule ${schedule.title}`}
                       className="p-1.5 rounded-lg bg-bg-app border border-border-card"
                     >
                       <Ionicons name="trash-outline" size={14} color={colors.rose} />

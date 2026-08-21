@@ -64,13 +64,13 @@ const IconGridCell = React.memo(
         >
           {item.family === "Ionicons" ? (
             <Ionicons
-              name={item.name as any}
+              name={item.name}
               size={24}
               color={isSelected ? colors.primary : colors.textMain}
             />
           ) : (
             <MaterialCommunityIcons
-              name={item.name as any}
+              name={item.name}
               size={24}
               color={isSelected ? colors.primary : colors.textMain}
             />
@@ -87,7 +87,9 @@ const IconGridCell = React.memo(
     );
   },
   (prev, next) =>
-    prev.isSelected === next.isSelected && prev.item.id === next.item.id
+    prev.isSelected === next.isSelected &&
+    prev.item.id === next.item.id &&
+    prev.onSelect === next.onSelect
 );
 
 IconGridCell.displayName = "IconGridCell";

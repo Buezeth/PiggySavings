@@ -195,9 +195,15 @@ export async function insertTransaction(
         const ruleId = Crypto.randomUUID();
         await txn.runAsync(
           `INSERT INTO allocation_rules (
-            id, goal_id, category_id, rule_type, value, min_income_cents, is_active
-          ) VALUES (?, ?, ?, 'fixed_cents', ?, 0, 1);`,
-          [ruleId, goalAllocation.goal_id, recurringSchedule.category_id, goalAllocation.amount_cents]
+            id, goal_id, category_id, schedule_id, rule_type, value, min_income_cents, is_active
+          ) VALUES (?, ?, ?, ?, 'fixed_cents', ?, 0, 1);`,
+          [
+            ruleId,
+            goalAllocation.goal_id,
+            recurringSchedule.category_id,
+            scheduleId,
+            Math.round(goalAllocation.amount_cents),
+          ]
         );
       }
     }

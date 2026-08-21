@@ -211,3 +211,14 @@ export async function processDueRecurringSchedules(): Promise<ProcessedScheduleR
 
   return results;
 }
+
+/**
+ * Clamps custom recurring days string/number to the inclusive 1–365 range.
+ * Defaults to 15 if missing, NaN, or non-positive.
+ */
+export function parseClampedCustomDays(input: string | number | null | undefined, fallback = 15): number {
+  if (input === null || input === undefined) return fallback;
+  const parsed = typeof input === "number" ? input : parseInt(input, 10);
+  if (isNaN(parsed) || parsed < 1) return fallback;
+  return Math.min(365, parsed);
+}

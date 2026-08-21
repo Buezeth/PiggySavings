@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { colors } from "./theme";
 
 export type IconFamily = "Ionicons" | "MaterialCommunityIcons";
 export type IconDomain =
@@ -14,13 +15,21 @@ export type PaletteToken = "primary" | "emerald" | "gold" | "rose";
 type IoniconsGlyph = keyof typeof Ionicons.glyphMap;
 type MaterialCommunityIconsGlyph = keyof typeof MaterialCommunityIcons.glyphMap;
 
-export interface IconDefinition {
-  id: string;
-  name: IoniconsGlyph | MaterialCommunityIconsGlyph;
-  label: string;
-  family: IconFamily;
-  domain: IconDomain;
-}
+export type IconDefinition =
+  | {
+      id: string;
+      name: IoniconsGlyph;
+      label: string;
+      family: "Ionicons";
+      domain: IconDomain;
+    }
+  | {
+      id: string;
+      name: MaterialCommunityIconsGlyph;
+      label: string;
+      family: "MaterialCommunityIcons";
+      domain: IconDomain;
+    };
 
 export interface PaletteStyles {
   token: PaletteToken;
@@ -31,6 +40,7 @@ export interface PaletteStyles {
   badgeBgClass: string;
   badgeTextClass: string;
   colorCode: string;
+  iconColor: string;
 }
 
 /**
@@ -45,7 +55,8 @@ export const PALETTE_CONFIG: Record<PaletteToken, PaletteStyles> = {
     textClass: "text-primary",
     badgeBgClass: "bg-coral-subtle",
     badgeTextClass: "text-text-brand",
-    colorCode: "primary",
+    colorCode: colors.primary,
+    iconColor: colors.primary,
   },
   emerald: {
     token: "emerald",
@@ -55,7 +66,8 @@ export const PALETTE_CONFIG: Record<PaletteToken, PaletteStyles> = {
     textClass: "text-emerald",
     badgeBgClass: "bg-emerald-subtle",
     badgeTextClass: "text-emerald-dark",
-    colorCode: "emerald",
+    colorCode: colors.emerald,
+    iconColor: colors.emerald,
   },
   gold: {
     token: "gold",
@@ -65,7 +77,8 @@ export const PALETTE_CONFIG: Record<PaletteToken, PaletteStyles> = {
     textClass: "text-gold",
     badgeBgClass: "bg-gold-subtle",
     badgeTextClass: "text-gold-dark",
-    colorCode: "gold",
+    colorCode: colors.goldDark,
+    iconColor: colors.goldDark,
   },
   rose: {
     token: "rose",
@@ -75,7 +88,8 @@ export const PALETTE_CONFIG: Record<PaletteToken, PaletteStyles> = {
     textClass: "text-rose",
     badgeBgClass: "bg-rose-subtle",
     badgeTextClass: "text-rose-dark",
-    colorCode: "rose",
+    colorCode: colors.rose,
+    iconColor: colors.rose,
   },
 };
 

@@ -21,6 +21,7 @@ export interface UpdateCategoryInput {
 export interface CategoryUsageCount {
   transactionCount: number;
   scheduleCount: number;
+  allocationCount: number;
 }
 
 export interface DeleteCategoryResult {
@@ -79,18 +80,25 @@ export async function createCustomCategory(
     throw new Error("Category name cannot be empty.");
   }
 
-  await db.runAsync(
-    `INSERT INTO categories (id, name, type, icon_name, icon_family, color_code, is_default)
-     VALUES (?, ?, ?, ?, ?, ?, 0);`,
-    [
-      id,
-      name,
-      input.type,
-      input.icon_name ?? null,
-      input.icon_family ?? null,
-      input.color_code ?? null,
-    ]
-  );
+  try {
+    await db.runAsync(
+      `INSERT INTO categories (id, name, type, icon_name, icon_family, color_code, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, 0);`,
+      [
+        id,
+        name,
+        input.type,
+        input.icon_name ?? null,
+        input.icon_family ?? null,
+        input.color_code ?? null,
+      ]
+    );
+  } catch (err: any) {
+    if (err?.message?.includes("UNIQUE constraint failed") || err?.message?.includes("idx_categories_name_type")) {
+      throw new Error(`A ${input.type} category named "${name}" already exists.`);
+    }
+    throw err;
+  }
 
   const created = await getCategoryById(id);
   if (!created) {
@@ -115,6 +123,16 @@ export async function updateCategory(
 
   if (existing.is_default === 1) {
     throw new Error("System default categories cannot be modified.");
+  }
+
+  if (fields.type !== undefined && fields.type !== existing.type) {
+    const counts = await getCategoryUsageCount(id);
+    const totalRefs = counts.transactionCount + counts.scheduleCount + counts.allocationCount;
+    if (totalRefs > 0) {
+      throw new Error(
+        `Cannot change category type for "${existing.name}". It is referenced by ${counts.transactionCount} transaction(s), ${counts.scheduleCount} recurring schedule(s), and ${counts.allocationCount} allocation rule(s).`
+      );
+    }
   }
 
   const setClauses: string[] = [];
@@ -150,17 +168,26 @@ export async function updateCategory(
   }
 
   values.push(id);
-  await db.runAsync(
-    `UPDATE categories SET ${setClauses.join(", ")} WHERE id = ?;`,
-    values
-  );
+
+  try {
+    await db.runAsync(
+      `UPDATE categories SET ${setClauses.join(", ")} WHERE id = ?;`,
+      values
+    );
+  } catch (err: any) {
+    if (err?.message?.includes("UNIQUE constraint failed") || err?.message?.includes("idx_categories_name_type")) {
+      const targetName = fields.name !== undefined ? fields.name.trim() : existing.name;
+      const targetType = fields.type !== undefined ? fields.type : existing.type;
+      throw new Error(`A ${targetType} category named "${targetName}" already exists.`);
+    }
+    throw err;
+  }
 
   return getCategoryById(id);
 }
 
 /**
- * High-performance batch aggregation of transaction and schedule counts for all categories.
- * Replaces N parallel queries with 2 grouped queries.
+ * High-performance batch aggregation of transaction, schedule, and allocation counts for all categories.
  */
 export async function getAllCategoryUsageCounts(): Promise<
   Record<string, CategoryUsageCount>
@@ -172,25 +199,34 @@ export async function getAllCategoryUsageCounts(): Promise<
   const schedRows = await db.getAllAsync<{ category_id: string; count: number }>(
     `SELECT category_id, COUNT(*) as count FROM recurring_schedules GROUP BY category_id;`
   );
+  const allocRows = await db.getAllAsync<{ category_id: string; count: number }>(
+    `SELECT category_id, COUNT(*) as count FROM allocation_rules WHERE category_id IS NOT NULL GROUP BY category_id;`
+  );
 
   const result: Record<string, CategoryUsageCount> = {};
   for (const row of txRows) {
     if (!result[row.category_id]) {
-      result[row.category_id] = { transactionCount: 0, scheduleCount: 0 };
+      result[row.category_id] = { transactionCount: 0, scheduleCount: 0, allocationCount: 0 };
     }
     result[row.category_id].transactionCount = row.count;
   }
   for (const row of schedRows) {
     if (!result[row.category_id]) {
-      result[row.category_id] = { transactionCount: 0, scheduleCount: 0 };
+      result[row.category_id] = { transactionCount: 0, scheduleCount: 0, allocationCount: 0 };
     }
     result[row.category_id].scheduleCount = row.count;
+  }
+  for (const row of allocRows) {
+    if (!result[row.category_id]) {
+      result[row.category_id] = { transactionCount: 0, scheduleCount: 0, allocationCount: 0 };
+    }
+    result[row.category_id].allocationCount = row.count;
   }
   return result;
 }
 
 /**
- * Returns the count of transactions and recurring schedules referencing a single category.
+ * Returns the count of transactions, recurring schedules, and allocation rules referencing a single category.
  */
 export async function getCategoryUsageCount(
   id: string
@@ -205,10 +241,15 @@ export async function getCategoryUsageCount(
     `SELECT COUNT(*) as count FROM recurring_schedules WHERE category_id = ?;`,
     [id]
   );
+  const allocRow = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM allocation_rules WHERE category_id = ?;`,
+    [id]
+  );
 
   return {
     transactionCount: txRow?.count ?? 0,
     scheduleCount: schedRow?.count ?? 0,
+    allocationCount: allocRow?.count ?? 0,
   };
 }
 
@@ -220,29 +261,36 @@ export async function deleteCategory(
   reassignToCategoryId?: string
 ): Promise<DeleteCategoryResult> {
   const db = await getDatabase();
-  const existing = await getCategoryById(id);
-
-  if (!existing) {
-    throw new Error(`Category with ID "${id}" does not exist.`);
-  }
-
-  if (existing.is_default === 1) {
-    throw new Error("System default categories cannot be deleted.");
-  }
-
-  if (reassignToCategoryId) {
-    if (reassignToCategoryId === id) {
-      throw new Error("Cannot reassign category to itself.");
-    }
-    const targetCategory = await getCategoryById(reassignToCategoryId);
-    if (!targetCategory) {
-      throw new Error(
-        `Target category for reassignment "${reassignToCategoryId}" does not exist.`
-      );
-    }
-  }
 
   return await runInExclusiveTransaction(db, async (txn) => {
+    const existing = await txn.getFirstAsync<CategoryRow>(
+      `SELECT * FROM categories WHERE id = ?;`,
+      [id]
+    );
+
+    if (!existing) {
+      throw new Error(`Category with ID "${id}" does not exist.`);
+    }
+
+    if (existing.is_default === 1) {
+      throw new Error("System default categories cannot be deleted.");
+    }
+
+    if (reassignToCategoryId) {
+      if (reassignToCategoryId === id) {
+        throw new Error("Cannot reassign category to itself.");
+      }
+      const targetCategory = await txn.getFirstAsync<CategoryRow>(
+        `SELECT * FROM categories WHERE id = ?;`,
+        [reassignToCategoryId]
+      );
+      if (!targetCategory) {
+        throw new Error(
+          `Target category for reassignment "${reassignToCategoryId}" does not exist.`
+        );
+      }
+    }
+
     let reassignedCount = 0;
 
     if (reassignToCategoryId) {
@@ -272,12 +320,16 @@ export async function deleteCategory(
         `SELECT COUNT(*) as count FROM recurring_schedules WHERE category_id = ?;`,
         [id]
       );
+      const allocCountRow = await txn.getFirstAsync<{ count: number }>(
+        `SELECT COUNT(*) as count FROM allocation_rules WHERE category_id = ?;`,
+        [id]
+      );
 
       const totalReferences =
-        (txCountRow?.count ?? 0) + (schedCountRow?.count ?? 0);
+        (txCountRow?.count ?? 0) + (schedCountRow?.count ?? 0) + (allocCountRow?.count ?? 0);
       if (totalReferences > 0) {
         throw new Error(
-          `Cannot delete category "${existing.name}". It is referenced by ${txCountRow?.count ?? 0} transaction(s) and ${schedCountRow?.count ?? 0} recurring schedule(s). Please specify a category to reassign these records to.`
+          `Cannot delete category "${existing.name}". It is referenced by ${txCountRow?.count ?? 0} transaction(s), ${schedCountRow?.count ?? 0} recurring schedule(s), and ${allocCountRow?.count ?? 0} allocation rule(s). Please specify a category to reassign these records to.`
         );
       }
     }

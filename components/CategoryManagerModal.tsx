@@ -177,29 +177,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               <MaterialCommunityIcons
                 name={(category.icon_name as any) || "tag-outline"}
                 size={20}
-                color={
-                  paletteToken === "emerald"
-                    ? colors.emerald
-                    : paletteToken === "rose"
-                      ? colors.rose
-                      : paletteToken === "gold"
-                        ? colors.goldDark
-                        : colors.primary
-                }
+                color={palette.colorCode}
               />
             ) : (
               <Ionicons
                 name={(category.icon_name as any) || "pricetag-outline"}
                 size={20}
-                color={
-                  paletteToken === "emerald"
-                    ? colors.emerald
-                    : paletteToken === "rose"
-                      ? colors.rose
-                      : paletteToken === "gold"
-                        ? colors.goldDark
-                        : colors.primary
-                }
+                color={palette.colorCode}
               />
             )}
           </View>
@@ -260,8 +244,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   return (
-    <Modal
-      visible={visible}
+    <>
+      <Modal
+        visible={visible}
       transparent
       animationType="slide"
       onRequestClose={() => {
@@ -303,6 +288,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     setActiveStep("list");
                     setCategoryToDelete(null);
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back"
                   className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-1"
                 >
                   <Ionicons name="arrow-back" size={18} color={colors.textMain} />
@@ -469,29 +456,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                             <MaterialCommunityIcons
                               name={(candidate.icon_name as any) || "tag-outline"}
                               size={18}
-                              color={
-                                paletteToken === "emerald"
-                                  ? colors.emerald
-                                  : paletteToken === "rose"
-                                    ? colors.rose
-                                    : paletteToken === "gold"
-                                      ? colors.goldDark
-                                      : colors.primary
-                              }
+                              color={palette.colorCode}
                             />
                           ) : (
                             <Ionicons
                               name={(candidate.icon_name as any) || "pricetag-outline"}
                               size={18}
-                              color={
-                                paletteToken === "emerald"
-                                  ? colors.emerald
-                                  : paletteToken === "rose"
-                                    ? colors.rose
-                                    : paletteToken === "gold"
-                                      ? colors.goldDark
-                                      : colors.primary
-                              }
+                              color={palette.colorCode}
                             />
                           )}
                         </View>
@@ -540,23 +511,23 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
           )}
         </View>
       </View>
-
-      {/* ─── CREATE / EDIT CATEGORY MODAL ─── */}
-      <CategoryFormModal
-        visible={isFormModalVisible}
-        onClose={() => {
-          setIsFormModalVisible(false);
-          setCategoryToEdit(null);
-        }}
-        categoryToEdit={categoryToEdit}
-        defaultType={formDefaultType}
-        onSuccess={() => {
-          setIsFormModalVisible(false);
-          setCategoryToEdit(null);
-          refreshData();
-        }}
-      />
     </Modal>
+
+    {/* ─── CREATE / EDIT CATEGORY MODAL (Sibling Mount) ─── */}
+    <CategoryFormModal
+      visible={isFormModalVisible}
+      onClose={() => {
+        setIsFormModalVisible(false);
+        setCategoryToEdit(null);
+      }}
+      categoryToEdit={categoryToEdit}
+      defaultType={formDefaultType}
+      onSuccess={() => {
+        setIsFormModalVisible(false);
+        setCategoryToEdit(null);
+      }}
+    />
+  </>
   );
 };
 

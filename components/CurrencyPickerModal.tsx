@@ -227,7 +227,7 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
             initialNumToRender={8}
             maxToRenderPerBatch={10}
             windowSize={3}
-            removeClippedSubviews={true}
+            removeClippedSubviews={Platform.OS === "android"}
             ListEmptyComponent={
               <View className="py-8 items-center justify-center">
                 <Text className="text-text-muted text-xs font-bold">

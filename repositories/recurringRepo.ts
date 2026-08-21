@@ -1,5 +1,5 @@
 import * as Crypto from "expo-crypto";
-import { getDatabase } from "../services/db/database";
+import { getDatabase, runInExclusiveTransaction } from "../services/db/database";
 import {
   RecurringScheduleRow,
   RecurringFrequency,
@@ -123,6 +123,13 @@ export async function updateRecurringSchedule(
     return null;
   }
 
+  const frequencyChanged =
+    (input.frequency !== undefined && input.frequency !== existing.frequency) ||
+    (input.custom_interval_days !== undefined &&
+      input.custom_interval_days !== existing.custom_interval_days) ||
+    (input.day_of_month !== undefined &&
+      input.day_of_month !== existing.day_of_month);
+
   const updates: string[] = [];
   const params: (string | number | null)[] = [];
 
@@ -161,6 +168,27 @@ export async function updateRecurringSchedule(
   if (input.next_occurrence !== undefined) {
     updates.push("next_occurrence = ?");
     params.push(input.next_occurrence.split("T")[0]);
+  } else if (frequencyChanged) {
+    const today = getLocalTodayStr();
+    const effectiveFrequency = input.frequency ?? existing.frequency;
+    const effectiveCustomDays =
+      input.custom_interval_days !== undefined
+        ? input.custom_interval_days
+        : existing.custom_interval_days;
+    const effectiveDayOfMonth =
+      input.day_of_month !== undefined
+        ? input.day_of_month
+        : existing.day_of_month;
+
+    const recalculatedNextDate = calculateNextOccurrence(
+      today,
+      effectiveFrequency,
+      effectiveCustomDays,
+      effectiveDayOfMonth,
+      today
+    );
+    updates.push("next_occurrence = ?");
+    params.push(recalculatedNextDate);
   }
   if (input.is_active !== undefined) {
     updates.push("is_active = ?");
@@ -189,17 +217,29 @@ export async function toggleRecurringSchedule(
 ): Promise<RecurringScheduleRow | null> {
   const db = await getDatabase();
 
-  if (isActive !== undefined) {
-    await db.runAsync(
+  await runInExclusiveTransaction(db, async (txn) => {
+    let newStatus: number;
+    if (isActive !== undefined) {
+      newStatus = isActive ? 1 : 0;
+    } else {
+      const current = await txn.getFirstAsync<{ is_active: number }>(
+        `SELECT is_active FROM recurring_schedules WHERE id = ?;`,
+        [id]
+      );
+      newStatus = current?.is_active === 1 ? 0 : 1;
+    }
+
+    await txn.runAsync(
       `UPDATE recurring_schedules SET is_active = ? WHERE id = ?;`,
-      [isActive ? 1 : 0, id]
+      [newStatus, id]
     );
-  } else {
-    await db.runAsync(
-      `UPDATE recurring_schedules SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?;`,
-      [id]
+
+    // Sync active state of any associated allocation rules
+    await txn.runAsync(
+      `UPDATE allocation_rules SET is_active = ? WHERE schedule_id = ?;`,
+      [newStatus, id]
     );
-  }
+  });
 
   return getRecurringScheduleById(id);
 }
@@ -209,10 +249,17 @@ export async function toggleRecurringSchedule(
  */
 export async function deleteRecurringSchedule(id: string): Promise<boolean> {
   const db = await getDatabase();
-  const result = await db.runAsync(
-    `DELETE FROM recurring_schedules WHERE id = ?;`,
-    [id]
-  );
-  return result.changes > 0;
+  return await runInExclusiveTransaction(db, async (txn) => {
+    // Delete associated allocation rules first (or cascade via FK)
+    await txn.runAsync(
+      `DELETE FROM allocation_rules WHERE schedule_id = ?;`,
+      [id]
+    );
+    const result = await txn.runAsync(
+      `DELETE FROM recurring_schedules WHERE id = ?;`,
+      [id]
+    );
+    return result.changes > 0;
+  });
 }
 

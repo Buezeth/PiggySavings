@@ -18,7 +18,7 @@ import { PALETTE_CONFIG, PaletteToken } from "../constants/iconRegistry";
 import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
 import { RecurringFrequency, RecurringScheduleRow } from "../services/db/types";
-import { calculateNextOccurrence, getLocalTodayStr } from "../services/recurring/recurringEngine";
+import { calculateNextOccurrence, getLocalTodayStr, parseClampedCustomDays } from "../services/recurring/recurringEngine";
 
 export interface RecurringScheduleModalProps {
   visible: boolean;
@@ -116,7 +116,7 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
       return;
     }
 
-    const customDaysNum = frequency === "custom" ? parseInt(customDays, 10) || 15 : null;
+    const customDaysNum = frequency === "custom" ? parseClampedCustomDays(customDays) : null;
     const parsedDayOfMonth = parseInt(dayOfMonth, 10);
     const dayOfMonthNum =
       frequency === "monthly"
@@ -340,9 +340,11 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
                     value={customDays}
                     onChangeText={setCustomDays}
                     keyboardType="number-pad"
+                    maxLength={3}
                     className="bg-bg-card px-3 py-1 rounded-xl text-text-main font-black text-sm border border-border-card w-16 text-center"
                   />
                   <Text className="text-text-muted text-xs font-bold ml-2">days</Text>
+                  <Text className="text-text-muted text-[11px] font-bold ml-1">(1–365)</Text>
                 </View>
               )}
             </View>
@@ -375,33 +377,13 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
                             <MaterialCommunityIcons
                               name={cat.icon_name as any}
                               size={15}
-                              color={
-                                isSelected
-                                  ? paletteToken === "emerald"
-                                    ? colors.emerald
-                                    : paletteToken === "rose"
-                                    ? colors.rose
-                                    : paletteToken === "gold"
-                                    ? colors.goldDark
-                                    : colors.primary
-                                  : colors.textMuted
-                              }
+                              color={isSelected ? palette.iconColor : colors.textMuted}
                             />
                           ) : (
                             <Ionicons
                               name={cat.icon_name as any}
                               size={15}
-                              color={
-                                isSelected
-                                  ? paletteToken === "emerald"
-                                    ? colors.emerald
-                                    : paletteToken === "rose"
-                                    ? colors.rose
-                                    : paletteToken === "gold"
-                                    ? colors.goldDark
-                                    : colors.primary
-                                  : colors.textMuted
-                              }
+                              color={isSelected ? palette.iconColor : colors.textMuted}
                             />
                           )}
                         </View>
