@@ -1,7 +1,8 @@
-import CartoonCard from "@/components/CartoonCard";
+import { CartoonCard } from "@/components/CartoonCard";
 import { GoalLimitModal } from "@/components/GoalLimitModal";
-import Hero from "@/components/Hero";
+import { Hero } from "@/components/Hero";
 import { IconPickerModal } from "@/components/IconPickerModal";
+import { RecurringReviewModal } from "@/components/RecurringReviewModal";
 import { TipJarModal } from "@/components/TipJarModal";
 import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
 import { getIconById, ICON_REGISTRY, IconDefinition } from "@/constants/iconRegistry";
@@ -19,6 +20,7 @@ import {
   Modal,
   Platform,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -79,13 +81,23 @@ const TAG_SUGGESTIONS = [
 export default function GoalsHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { goals, transactions, cashflowSummary, createGoal, currencyCode, currencySymbol, formatMoney } = useApp();
+  const {
+    goals,
+    transactions,
+    cashflowSummary,
+    pendingRecurringSchedules,
+    createGoal,
+    currencyCode,
+    currencySymbol,
+    formatMoney,
+  } = useApp();
 
   const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
 
   const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>("30D");
   const [isGoalLimitModalVisible, setIsGoalLimitModalVisible] = useState(false);
   const [isTipJarModalVisible, setIsTipJarModalVisible] = useState(false);
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
   const [goalLimitInfo, setGoalLimitInfo] = useState({
     currentCount: 0,
     maxLimit: 3,
@@ -97,6 +109,7 @@ export default function GoalsHomeScreen() {
   const [newGoalTarget, setNewGoalTarget] = useState("");
   const [newGoalCategory, setNewGoalCategory] = useState("🎯 Savings");
   const [newGoalCardVariant, setNewGoalCardVariant] = useState<CardVariant>("card");
+  const [isNewGoalFeatured, setIsNewGoalFeatured] = useState(false);
   const [selectedGoalIcon, setSelectedGoalIcon] = useState<IconDefinition>(
     getIconById("milestones-target") || ICON_REGISTRY[0]
   );
@@ -233,10 +246,11 @@ export default function GoalsHomeScreen() {
     };
   }, [goals, transactions, cashflowSummary, selectedPeriod, formatMoney]);
 
-  // Featured Goal Selection: Returns the first goal when available
+  // Featured Goal Selection: Prioritizes explicitly pinned featured goal, otherwise first goal
   const featuredGoal = useMemo(() => {
     if (goals.length === 0) return null;
-    return goals[0];
+    const explicitFeatured = goals.find((g) => g.priority_label === "Featured Goal");
+    return explicitFeatured || goals[0];
   }, [goals]);
 
   const featuredProgressPercent = featuredGoal
@@ -305,13 +319,14 @@ export default function GoalsHomeScreen() {
         icon_name: selectedGoalIcon.name,
         icon_family: selectedGoalIcon.family,
         card_variant: newGoalCardVariant,
-        priority_label: "Active Goal",
+        priority_label: isNewGoalFeatured ? "Featured Goal" : "Active Goal",
       });
 
       setNewGoalTitle("");
       setNewGoalTarget("");
       setNewGoalCategory("🎯 Savings");
       setNewGoalCardVariant("card");
+      setIsNewGoalFeatured(false);
       setSelectedGoalIcon(getIconById("milestones-target") || ICON_REGISTRY[0]);
       setIsAddGoalModalVisible(false);
     } catch (err) {
@@ -336,8 +351,40 @@ export default function GoalsHomeScreen() {
           onNotificationPress={() => router.push("/insights")}
         />
 
+        {/* ─── PENDING RECURRING REVIEW BANNER ─── */}
+        {pendingRecurringSchedules.length > 0 && (
+          <View className="px-5 mt-6">
+            <CartoonCard
+              variant="gold"
+              interactive
+              onPress={() => setIsReviewModalVisible(true)}
+              className="p-4 flex-row items-center justify-between"
+            >
+              <View className="flex-1 mr-2">
+                <View className="flex-row items-center mb-1">
+                  <View className="w-5 h-5 rounded-full bg-gold items-center justify-center mr-1.5 shadow-sm">
+                    <Ionicons name="flash" size={12} color={colors.white} />
+                  </View>
+                  <Text className="text-gold-dark text-xs font-black uppercase tracking-wider">
+                    ⚡ {pendingRecurringSchedules.length} Recurring Bill{pendingRecurringSchedules.length === 1 ? "" : "s"} Due for Review
+                  </Text>
+                </View>
+                <Text className="text-text-main text-xs font-bold" numberOfLines={1}>
+                  Review amounts for {pendingRecurringSchedules[0].title}{pendingRecurringSchedules.length > 1 ? " and more." : "."}
+                </Text>
+              </View>
+
+              <View className="bg-gold px-3 py-2 rounded-2xl border-2 border-gold-light border-b-4 border-b-gold-dark">
+                <Text className="text-white text-xs font-black uppercase tracking-wider">
+                  Review ({pendingRecurringSchedules.length})
+                </Text>
+              </View>
+            </CartoonCard>
+          </View>
+        )}
+
         {/* ─── SECTION: FEATURED GOAL ─── */}
-        <View className="px-5 mt-10">
+        <View className="px-5 mt-6">
           <View className="flex-row items-center justify-between mb-3">
             <Text className="text-text-main text-lg font-black tracking-tight">
               Featured Goal ⭐
@@ -808,6 +855,137 @@ export default function GoalsHomeScreen() {
                 </ScrollView>
               </View>
 
+              {/* Set as Featured Goal Toggle */}
+              <CartoonCard className="mb-2 p-3.5 flex-row items-center justify-between">
+                <View className="flex-row items-center flex-1 mr-3">
+                  <View className="w-9 h-9 rounded-xl bg-gold-subtle border border-gold-border items-center justify-center mr-2.5">
+                    <Ionicons name="star" size={18} color={colors.goldDark} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text-main text-xs font-black">
+                      Set as Featured Goal ⭐
+                    </Text>
+                    <Text className="text-text-muted text-[11px] font-bold">
+                      Pins this goal to the top of your dashboard
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={isNewGoalFeatured}
+                  onValueChange={setIsNewGoalFeatured}
+                  trackColor={{ false: colors.mutedTrack, true: colors.primary }}
+                  thumbColor={colors.white}
+                />
+              </CartoonCard>
+
+              {/* Live Goal Card Preview */}
+              <View className="mb-2">
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider">
+                    Live Card Preview
+                  </Text>
+                  <Text className="text-primary text-[11px] font-bold">
+                    What your goal card looks like
+                  </Text>
+                </View>
+
+                {(() => {
+                  const parsed = parseCurrencyToCents(newGoalTarget, currencyCode);
+                  const targetCents = parsed?.cents || 100000;
+                  const isGold = newGoalCardVariant === "gold";
+                  const isIncome = newGoalCardVariant === "income";
+                  const isSubtle = newGoalCardVariant === "subtle";
+
+                  const iconBgClass = isGold
+                    ? "will-change-variable bg-gold"
+                    : isIncome
+                    ? "will-change-variable bg-emerald"
+                    : isSubtle
+                    ? "will-change-variable bg-bg-accent"
+                    : "will-change-variable bg-primary";
+
+                  const amountTextClass = isGold
+                    ? "will-change-variable text-gold-dark"
+                    : isIncome
+                    ? "will-change-variable text-emerald-dark"
+                    : "will-change-variable text-primary";
+
+                  const badgeBorderClass = isGold
+                    ? "will-change-variable border-gold-border"
+                    : isIncome
+                    ? "will-change-variable border-emerald-border"
+                    : "will-change-variable border-border-card";
+
+                  const progressFillClass = isGold
+                    ? "will-change-variable bg-gold-dark"
+                    : isIncome
+                    ? "will-change-variable bg-emerald"
+                    : "will-change-variable bg-primary";
+
+                  return (
+                    <CartoonCard variant={newGoalCardVariant} className="p-4">
+                      <View className="flex-row items-center justify-between mb-3">
+                        <View
+                          className={`w-10 h-10 rounded-2xl ${iconBgClass} items-center justify-center shadow-sm`}
+                        >
+                          {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
+                            <MaterialCommunityIcons
+                              name={selectedGoalIcon.name as any}
+                              size={20}
+                              color={colors.white}
+                            />
+                          ) : (
+                            <Ionicons
+                              name={selectedGoalIcon.name as any}
+                              size={20}
+                              color={colors.white}
+                            />
+                          )}
+                        </View>
+
+                        <View className="flex-row items-center gap-1.5">
+                          {isNewGoalFeatured && (
+                            <View className="bg-gold px-2 py-0.5 rounded-lg border border-gold-dark">
+                              <Text className="text-white text-[10px] font-black">
+                                ⭐ Featured
+                              </Text>
+                            </View>
+                          )}
+                          <View
+                            className={`bg-white-overlay-80 px-2 py-0.5 rounded-lg border ${badgeBorderClass}`}
+                          >
+                            <Text className={`${amountTextClass} text-[10px] font-black`}>
+                              0%
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      <Text
+                        className="text-text-main text-sm font-black mb-0.5"
+                        numberOfLines={1}
+                      >
+                        {newGoalTitle.trim() || "Your Goal Title"}
+                      </Text>
+                      <Text className={`${amountTextClass} text-base font-black`}>
+                        {formatMoney(0)}
+                      </Text>
+                      <Text className="text-text-muted text-[11px] font-bold mb-3">
+                        of {formatMoney(targetCents)} goal
+                      </Text>
+
+                      {/* Playful Progress Bar Preview */}
+                      <View className="h-2.5 bg-white-overlay-70 rounded-full overflow-hidden border border-white-overlay-20">
+                        <View
+                          style={{ width: "6%" }}
+                          className={`h-full ${progressFillClass} rounded-full`}
+                        />
+                      </View>
+                    </CartoonCard>
+                  );
+                })()}
+              </View>
+
               {/* Submit Button */}
               <View className="pt-2 pb-6">
                 <TouchableOpacity
@@ -837,6 +1015,12 @@ export default function GoalsHomeScreen() {
           setIsIconPickerVisible(false);
         }}
         title="Choose Goal Icon"
+      />
+
+      {/* ─── RECURRING BILLS REVIEW MODAL ─── */}
+      <RecurringReviewModal
+        visible={isReviewModalVisible}
+        onClose={() => setIsReviewModalVisible(false)}
       />
     </View>
   );

@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
-import CartoonCard from "./CartoonCard";
+import { CartoonCard } from "./CartoonCard";
 import { PiggyBank } from "./PiggyBank";
 
 interface HeroProps {
@@ -34,9 +34,10 @@ export const Hero: React.FC<HeroProps> = ({
 
   const periods: TimePeriod[] = ["7D", "30D", "90D"];
 
-  const healthScore = data.healthScore;
-  const maxScore = data.maxHealthScore || 100;
-  const gaugePercent = Math.min(Math.max(healthScore / maxScore, 0.01), 1);
+  const healthScore = Math.max(0, data.healthScore || 0);
+  const maxScore = Math.max(1, data.maxHealthScore || 100);
+  const rawGaugePercent = healthScore / maxScore;
+  const gaugePercent = isNaN(rawGaugePercent) ? 0.01 : Math.min(Math.max(rawGaugePercent, 0.01), 1);
   const activeAngle = 180 + gaugePercent * 180;
 
   // Responsive sizing: 80% screen width

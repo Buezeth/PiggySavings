@@ -21,7 +21,7 @@ import {
 } from "../repositories/categoryRepo";
 import { CategoryRow } from "../services/db/types";
 import { CartoonCard } from "./CartoonCard";
-import CategoryFormModal from "./CategoryFormModal";
+import { CategoryFormModal } from "./CategoryFormModal";
 
 export interface CategoryManagerModalProps {
   visible: boolean;
@@ -33,7 +33,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   onClose,
 }) => {
   const insets = useSafeAreaInsets();
-  const { categories, deleteCategory, refreshData } = useApp();
+  const { categories, categoryBudgetSummaries, formatMoney, deleteCategory } = useApp();
 
   const [usageCounts, setUsageCounts] = useState<
     Record<string, CategoryUsageCount>
@@ -163,70 +163,99 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
       (category.type === "income" ? "emerald" : "primary");
     const palette = PALETTE_CONFIG[paletteToken] || PALETTE_CONFIG.primary;
     const counts = usageCounts[category.id] ?? { transactionCount: 0, scheduleCount: 0, allocationCount: 0 };
+    const budgetSummary = categoryBudgetSummaries.find((b) => b.categoryId === category.id);
+    const hasBudget = category.monthly_budget_cents !== null && category.monthly_budget_cents !== undefined && category.monthly_budget_cents > 0;
+    const budgetCents = hasBudget ? (category.monthly_budget_cents as number) : 0;
+    const spentCents = budgetSummary?.spentCents ?? 0;
+    const percentageUsed = hasBudget ? Math.round((spentCents / budgetCents) * 100) : 0;
+    const isOver = hasBudget && spentCents >= budgetCents;
+
+    let pacingBarClass = "bg-emerald";
+    if (percentageUsed >= 100) {
+      pacingBarClass = "bg-rose";
+    } else if (percentageUsed >= 75) {
+      pacingBarClass = "bg-gold";
+    }
 
     return (
       <View
         key={category.id}
-        className={`flex-row items-center justify-between py-3 ${!isLast ? "border-b border-bg-app" : ""
-          }`}
+        className={`py-3.5 ${!isLast ? "border-b border-bg-app" : ""}`}
       >
-        <View className="flex-row items-center flex-1 mr-3">
-          <View
-            className={`will-change-variable w-11 h-11 rounded-2xl items-center justify-center mr-3 border-2 border-b-4 ${palette.bgSubtleClass} ${palette.borderClass}`}
-          >
-            {category.icon_family === "MaterialCommunityIcons" ? (
-              <MaterialCommunityIcons
-                name={(category.icon_name as any) || "tag-outline"}
-                size={20}
-                color={palette.colorCode}
-              />
-            ) : (
-              <Ionicons
-                name={(category.icon_name as any) || "pricetag-outline"}
-                size={20}
-                color={palette.colorCode}
-              />
-            )}
-          </View>
-
-          <View className="flex-1">
-            <View className="flex-row items-center flex-wrap gap-1.5">
-              <Text className="text-text-main text-sm font-black">
-                {category.name}
-              </Text>
-              {isDefault && (
-                <View className="bg-coral-subtle px-2 py-0.5 rounded-md border border-border-card flex-row items-center">
-                  <Ionicons name="lock-closed" size={10} color={colors.primary} />
-                  <Text className="text-primary text-[10px] font-black ml-1 uppercase">
-                    Default
-                  </Text>
-                </View>
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center flex-1 mr-3">
+            <View
+              className={`will-change-variable w-11 h-11 rounded-2xl items-center justify-center mr-3 border-2 border-b-4 ${palette.bgSubtleClass} ${palette.borderClass}`}
+            >
+              {category.icon_family === "MaterialCommunityIcons" ? (
+                <MaterialCommunityIcons
+                  name={(category.icon_name as any) || "tag-outline"}
+                  size={20}
+                  color={palette.colorCode}
+                />
+              ) : (
+                <Ionicons
+                  name={(category.icon_name as any) || "pricetag-outline"}
+                  size={20}
+                  color={palette.colorCode}
+                />
               )}
             </View>
 
-            <Text className="text-text-muted text-xs font-bold mt-0.5">
-              {counts.transactionCount} transaction
-              {counts.transactionCount === 1 ? "" : "s"}
-              {counts.scheduleCount > 0 &&
-                ` • ${counts.scheduleCount} recurring`}
-              {counts.allocationCount > 0 &&
-                ` • ${counts.allocationCount} rule${counts.allocationCount === 1 ? "" : "s"}`}
-            </Text>
-          </View>
-        </View>
+            <View className="flex-1">
+              <View className="flex-row items-center flex-wrap gap-1.5">
+                <Text className="text-text-main text-sm font-black">
+                  {category.name}
+                </Text>
+                {isDefault && (
+                  <View className="bg-coral-subtle px-2 py-0.5 rounded-md border border-border-card flex-row items-center">
+                    <Ionicons name="lock-closed" size={10} color={colors.primary} />
+                    <Text className="text-primary text-[10px] font-black ml-1 uppercase">
+                      Default
+                    </Text>
+                  </View>
+                )}
+                {isOver && (
+                  <View className="bg-rose-subtle px-2 py-0.5 rounded-md border border-rose-border flex-row items-center">
+                    <Text className="text-rose-dark text-[10px] font-black uppercase">
+                      ⚠️ Over Budget
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-        <View className="flex-row items-center gap-2">
-          {!isDefault ? (
-            <>
+              <Text className="text-text-muted text-xs font-bold mt-0.5">
+                {counts.transactionCount} transaction
+                {counts.transactionCount === 1 ? "" : "s"}
+                {counts.scheduleCount > 0 &&
+                  ` • ${counts.scheduleCount} recurring`}
+                {counts.allocationCount > 0 &&
+                  ` • ${counts.allocationCount} rule${counts.allocationCount === 1 ? "" : "s"}`}
+              </Text>
+            </View>
+          </View>
+
+          <View className="flex-row items-center gap-2">
+            {(!isDefault || category.type === "expense") && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => handleOpenEdit(category)}
                 className="p-2 rounded-xl bg-bg-app border-2 border-border-card border-b-4 border-b-border-card-dark"
-                accessibilityLabel={`Edit ${category.name}`}
+                accessibilityLabel={
+                  isDefault
+                    ? `Set budget limit for ${category.name}`
+                    : `Edit ${category.name}`
+                }
               >
-                <Ionicons name="pencil" size={14} color={colors.textMain} />
+                <Ionicons
+                  name={isDefault ? "speedometer-outline" : "pencil"}
+                  size={14}
+                  color={colors.textMain}
+                />
               </TouchableOpacity>
+            )}
 
+            {!isDefault && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => handleDeletePress(category)}
@@ -235,13 +264,38 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               >
                 <Ionicons name="trash-outline" size={14} color={colors.rose} />
               </TouchableOpacity>
-            </>
-          ) : (
-            <View className="p-2 rounded-xl bg-bg-app opacity-60">
-              <Ionicons name="shield-checkmark-outline" size={16} color={colors.textMuted} />
-            </View>
-          )}
+            )}
+          </View>
         </View>
+
+        {/* Category Monthly Budget Progress Bar (when budget is set) */}
+        {hasBudget && (
+          <View className="mt-2.5 pt-2 border-t border-bg-app">
+            <View className="flex-row items-center justify-between mb-1.5">
+              <Text className="text-text-muted text-[11px] font-bold">
+                Spent <Text className="text-text-main font-black">{formatMoney(spentCents)}</Text> of{" "}
+                <Text className="text-text-main font-black">{formatMoney(budgetCents)}</Text>
+              </Text>
+              <Text
+                className={`will-change-variable text-[11px] font-black ${
+                  percentageUsed >= 100
+                    ? "text-rose"
+                    : percentageUsed >= 75
+                    ? "text-gold-dark"
+                    : "text-emerald"
+                }`}
+              >
+                {percentageUsed}%
+              </Text>
+            </View>
+            <View className="h-2 bg-bg-app rounded-full overflow-hidden border border-border-card">
+              <View
+                style={{ width: `${Math.min(100, Math.max(0, percentageUsed))}%` }}
+                className={`will-change-variable h-full rounded-full ${pacingBarClass}`}
+              />
+            </View>
+          </View>
+        )}
       </View>
     );
   };

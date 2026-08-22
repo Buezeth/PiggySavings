@@ -1,4 +1,4 @@
-import CartoonCard from "@/components/CartoonCard";
+import { CartoonCard } from "@/components/CartoonCard";
 import { TipJarModal } from "@/components/TipJarModal";
 import { CurrencyPickerModal } from "@/components/CurrencyPickerModal";
 import { RecurringScheduleModal } from "@/components/RecurringScheduleModal";
@@ -28,7 +28,6 @@ export default function ProfileScreen() {
     formatMoney,
     toggleRecurring,
     deleteRecurring,
-    refreshData,
   } = useApp();
 
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);

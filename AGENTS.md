@@ -7,9 +7,11 @@
 
 ## 💡 Project Identity & Product Requirements
 
-PiggySavings is a privacy-first, goal-oriented personal finance and smart savings mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, and a **100% Zero-Backend, Local-First Architecture** (`expo-sqlite` + `expo-secure-store`).
+PiggySavings is a privacy-first, goal-oriented personal finance and smart budgeting mobile application built with **React Native (Expo Router)**, **NativeWind v4 (TailwindCSS)**, and a **100% Zero-Backend, Local-First Architecture** (`expo-sqlite` + `expo-secure-store`).
 
 There are **zero hosted server databases and zero mandatory account creation requirements**. Users retain 100% ownership of their financial data, backed up directly to their personal cloud storage (Google Drive AppData / iCloud / encrypted local file export).
+
+The app combines **Category Envelope Budgeting**, **Smart Savings Goals (Pay-Yourself-First)**, **Scheduled Recurring Automation**, and **Tactile Gamification** (Duolingo-style 3D aesthetics) into a unified financial hub.
 
 All agentic decisions, component implementations, schemas, and features **MUST** strictly adhere to the technical specifications defined below.
 
@@ -20,9 +22,10 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 ```text
                        ┌──────────────────────────────┐
                        │     Local-First Device       │
-                       │  • expo-sqlite DB            │
+                       │  • expo-sqlite DB (Schema v3)│
                        │  • expo-secure-store Tokens  │
                        │  • On-Device Recurring Engine│
+                       │  • Category Spending Envelopes│
                        │  • Local Notification Nudges │
                        └──────────────┬───────────────┘
                                       │
@@ -41,35 +44,57 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 ### 1. Zero-Backend & Accountless Privacy Architecture
 - **Zero Mandatory Sign-Up**: The app opens directly to the dashboard with 0ms latency. No email, password, or third-party server account is required.
-- **Local SQLite Engine (`expo-sqlite`)**: All financial ledgers, categories, savings goals, recurring rules, and entitlement metadata reside exclusively on the user's physical device.
+- **Local SQLite Engine (`expo-sqlite`)**: All financial ledgers, category budgets, savings goals, recurring rules, and entitlement metadata reside exclusively on the user's physical device.
 - **Personal Cloud Backup & Restore**:
   - **Google Drive (`appDataFolder`)**: Backs up encrypted database snapshots directly to the user's hidden Google Drive application folder (completely private and isolated from accidental deletion).
   - **Encrypted File Export / Import**: Users can export or import their `.piggysave` / `.json` backup file anytime via `expo-sharing` and `expo-document-picker`.
 
-### 2. Scheduled Recurring Transactions & Savings Automation
+### 2. Dual-Core Budgeting, Envelopes & Mental Accounting
+- **Category Spending Envelopes**:
+  - Every expense category supports an optional monthly limit (`monthly_budget_cents INTEGER DEFAULT NULL`).
+  - The UI tracks real-time monthly pacing (`Spent / Budget`) with progressive color states:
+    - `< 75%` ➔ `text-emerald` / `bg-emerald-subtle`
+    - `75%–99%` ➔ `text-gold-dark` / `bg-gold-subtle`
+    - `≥ 100%` ➔ `text-rose` / `bg-rose-subtle` with explicit overspending warnings.
+- **Spendable Cash vs. Goal-Reserved Separation**:
+  - `Raw Cashflow = Total Income - Total Expenses`.
+  - `Spendable Balance = Total Income - Total Expenses - Active Goal Balances`.
+  - The app must **never** mislead the user into believing money locked in savings goals is free unallocated cash available to spend.
+- **Bi-Directional Goal Flow**:
+  - **Inflow (Partial Allocations)**: When logging income, users can split allocations to active goals using presets (`10%`, `20%`, `50%`, `100%`, or custom amounts) rather than forcing 100% of the transaction amount.
+  - **Outflow (Goal Realization & Withdrawals)**: When an expense is funded by a savings goal (e.g. buying flights saved under "Japan Trip"), the transaction references `source_goal_id`, deducting from that goal's balance while categorizing the expense.
+
+### 3. Transaction Lifecycle & Reversible Mutations
+- **Full CRUD & Interactivity**: Every transaction in the ledger can be viewed in detail, edited, or deleted.
+- **Atomic Deletion / Edit Rollbacks**:
+  - Deleting an income transaction that funded a goal must atomically deduct that amount from the goal's `current_amount_cents` and purge the linked `goal_contributions` audit entry.
+  - Deleting an expense funded by a goal (`source_goal_id`) must atomically restore those funds back to the goal's `current_amount_cents`.
+  - All balance reconciliations must occur in an atomic SQLite transaction (`runInExclusiveTransaction`).
+
+### 4. Scheduled Recurring Transactions & Safe Review Queue
 - **Local Engine (`services/recurring/recurringEngine.ts`)**:
   - Runs on app launch and foreground resume (`AppState.addEventListener`).
-  - Checks `recurring_schedules` where `next_occurrence <= date('now')` and `is_active = 1`.
-  - Automatically records due salary paychecks, subscriptions, utilities, and transport expenses.
+  - Evaluates `recurring_schedules` where `next_occurrence <= date('now')` and `is_active = 1`.
+  - Automatically records fixed salary paychecks, subscriptions, and rent, or flags variable recurring bills (e.g. utilities) in a **Review Queue** so users can adjust amounts before writing to the ledger.
   - Computes the next occurrence interval (e.g. every 15 days, monthly, weekly).
 - **Pay Yourself First (Auto-Allocation Engine)**:
   - When an incoming paycheck is logged, `services/allocation/allocationEngine.ts` calculates rule splits (percentage or fixed amounts) and routes savings to active goals.
-  - Respects remaining goal balance caps to prevent over-saving.
+  - Respects remaining goal balance caps to prevent over-saving. Automatically updates goal status to `'completed'` when target is met, and back to `'active'` if funds are withdrawn.
 
-### 3. Monetization Strategy: 3-Goal Limit + Rewarded Ads & Supporter Tip Jar
+### 5. Monetization Strategy: 3-Goal Limit + Rewarded Ads & Supporter Tip Jar
 - **Free Tier Limits**: Max **3 Active Goals** simultaneously.
 - **Goal Limit Interceptor**: If an un-entitled user attempts to create a 4th goal, display `<GoalLimitModal />`:
   - **Option A (Rewarded Ad)**: Watch a short video ad to unlock $+1$ goal slot (`unlocked_goal_slots += 1`).
   - **Option B (Supporter Tip Jar)**: One-time tip ($1.99, $4.99, $9.99) via In-App Purchase to unlock permanent **Unlimited Goals**, custom badges, and remove all ad prompts.
-- All core budgeting tools, recurring transaction automation, analytics, insights, and offline capabilities remain **100% free and un-gated forever**.
+- All core budgeting tools, category envelopes, recurring transaction automation, analytics, insights, and offline capabilities remain **100% free and un-gated forever**.
 
-### 4. Data Model & Atomic Financial Calculations
-- **Integer Cents Precision**: **NEVER** use standard floating-point numbers for money. All transaction amounts, goal targets, and balances **MUST** be stored as integer cents (`amount_cents INTEGER`, e.g., $10.50 stored as `1050`).
+### 6. Data Model & Atomic Financial Calculations
+- **Integer Cents Precision**: **NEVER** use standard floating-point numbers for money. All transaction amounts, goal targets, category budgets, and balances **MUST** be stored as integer cents (`amount_cents INTEGER`, e.g., $10.50 stored as `1050`).
 - **Dynamic Multi-Currency Formatting**:
   - **FORBIDDEN**: AI agents must **NEVER** hardcode dollar signs (e.g. `"$"` or `+$${...}`) in JSX labels or text templates.
   - All currency rendering **MUST** consume dynamic formatting from `useApp()` (`formatMoney(cents, options)`) or `currencySymbol` to respect the user's chosen display currency (stored in `user_preferences.preferred_currency`).
 - **Atomic Balance Updates & Bundled Mutations**:
-  - Goal balances, transaction entries, and associated recurring schedules must always execute within atomic database transactions (`runInExclusiveTransaction` / `db.withTransactionAsync`) to guarantee ACID compliance.
+  - Goal balances, category budgets, transaction entries, and associated recurring schedules must always execute within atomic database transactions (`runInExclusiveTransaction` / `db.withTransactionAsync`) to guarantee ACID compliance.
   - Multi-entity workflows (e.g. logging a transaction + goal allocation + recurring schedule) must be committed in a single database transaction so that a failure in one operation never leaves orphaned records.
 - **Client Idempotency & Re-entrancy Protection**:
   - Attach client UUID v4 `idempotency_key` to all transaction and contribution creations to prevent double insertions.
@@ -78,8 +103,9 @@ All agentic decisions, component implementations, schemas, and features **MUST**
   - Central reactive contexts (e.g., `AppContext`) must maintain monotonically increasing generation and mutation revision refs (e.g., `refreshGenerationRef`, `recurringMutationRevisionRef`).
   - Capture snapshot revisions at query dispatch and verify that local optimistic mutations are not overwritten by stale asynchronous `refreshData` results.
 
-### 5. Analytics & Projection Integrity
+### 7. Analytics & Projection Integrity
 - **Signed Velocity Calculations**: Financial velocity metrics (e.g., 30-day net cashflow) must compute the true signed difference (`income - expenses`). Never clamp the underlying metric to zero; clamp only the visual width of progress bars (`Math.max(0, ...)`).
+- **Dynamic Velocity Benchmarks**: Calculate progress bar scaling dynamically based on the user's monthly income or annual goal targets (`Math.max(monthlyIncome, totalGoalTargets / 12, 50000)`). **NEVER** hardcode a static $1,000 baseline (which breaks zero-decimal currencies like JPY/KRW).
 - **Goal-Specific Completion Projections**: Projections for individual goals (e.g., days remaining estimates) must be derived from contributions specific to that goal rather than global app cashflow.
 - **Dynamic Trend & Pace States**:
   - Derive trend directions (`"up" | "down" | "neutral"`) from computed numerical thresholds rather than hardcoded positive assumptions.
@@ -88,9 +114,9 @@ All agentic decisions, component implementations, schemas, and features **MUST**
   - Always validate timestamps (`!isNaN(d.getTime())`) before formatting.
   - Group and compare dates using calendar year/month/date boundaries instead of elapsed-millisecond division to ensure correct "Today" and "Yesterday" labeling across midnight boundaries.
 
-### 6. On-Device Push Notifications & Behavioral Nudges
+### 8. On-Device Push Notifications & Behavioral Nudges
 - **100% Local Scheduling (`expo-notifications`)**: No remote push servers.
-- Schedules daily logging reminders, weekly progress summaries, milestone celebrations (25%, 50%, 75%, 100%), and streak nudges directly on the operating system's local notification daemon.
+- Schedules daily logging reminders, weekly progress summaries, category budget threshold alerts (75%, 100%), milestone celebrations (25%, 50%, 75%, 100%), and streak nudges directly on the operating system's local notification daemon.
 
 ---
 
@@ -149,7 +175,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
 
 ## 🎮 Playful Cartoon / Gamified (Duolingo-Style) Visual Language
 
-PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make saving feel playful and rewarding:
+PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make saving and budgeting feel playful and rewarding:
 
 ### 1. Extruded 3D Cards & Buttons (`components/CartoonCard.tsx`)
 - All major content containers, modals, sheets, and primary action buttons **MUST** feature a 3D extruded bottom border (`border-2 ... border-b-4 ...`) using `<CartoonCard>`.
@@ -187,4 +213,4 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make sa
    - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
 5. **Transparency & Honesty in Action Feedback**:
    - Never show simulated success alerts for features that are stubbed or pending full delivery (e.g. cloud sync, file export). Instead, accurately inform the user of the current status or disable the interaction.
-6. **Performance**: 0ms latency UI updates using local SQLite queries and optimistic state updates.
+1. **Performance**: 0ms latency UI updates using local SQLite queries and optimistic state updates.

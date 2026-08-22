@@ -1,10 +1,9 @@
 import "../global.css";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, AppState, AppStateStatus, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
 import { Stack } from "expo-router";
 import { initDatabase } from "../services/db/database";
-import { processDueRecurringSchedules } from "../services/recurring/recurringEngine";
-import colors from "../constants/theme";
+import { colors } from "../constants/theme";
 import { AppProvider } from "../context/AppContext";
 
 export default function RootLayout() {
@@ -15,7 +14,6 @@ export default function RootLayout() {
     try {
       setInitError(null);
       await initDatabase();
-      await processDueRecurringSchedules();
       setIsReady(true);
     } catch (error) {
       console.error("Database initialization failed:", error);

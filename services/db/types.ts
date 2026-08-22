@@ -20,6 +20,7 @@ export interface CategoryRow {
   icon_family: string | null;
   color_code: string | null;
   is_default: number;
+  monthly_budget_cents: number | null;
 }
 
 export interface GoalRow {
@@ -46,7 +47,17 @@ export interface TransactionRow {
   note: string | null;
   transaction_date: string;
   idempotency_key: string | null;
+  source_goal_id?: string | null;
+  is_refund?: number;
   created_at: string;
+}
+
+export interface UpdateTransactionInput {
+  category_id?: string;
+  amount_cents?: number;
+  note?: string | null;
+  transaction_date?: string;
+  source_goal_id?: string | null;
 }
 
 export interface GoalContributionRow {

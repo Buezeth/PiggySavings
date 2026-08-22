@@ -1210,14 +1210,11 @@ export function parseCurrencyToCents(
   // Zero-decimal currencies (e.g. JPY, KRW, VND) do not allow decimal fractions in user input
   if (curr.decimal_digits === 0) {
     if (trimmed.includes(".")) {
-      const parts = trimmed.split(".");
-      if (parts[1] && parseInt(parts[1], 10) > 0) {
-        return {
-          cents: 0,
-          roundedValue: 0,
-          error: `${curr.code} does not support fractional decimal units.`,
-        };
-      }
+      return {
+        cents: 0,
+        roundedValue: 0,
+        error: `${curr.code} is a zero-decimal currency and does not support decimal places.`,
+      };
     }
   }
 

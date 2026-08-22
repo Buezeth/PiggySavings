@@ -134,7 +134,7 @@ export async function updateGoal(
 
 /**
  * Apply atomic delta to a goal balance and record an audit row in goal_contributions.
- * Ensures strict integer cents precision and ACID compliance via platform-aware exclusive transactions.
+ * Ensures strict integer cents precision, status transitions, and ACID compliance via platform-aware exclusive transactions.
  */
 export async function applyGoalDelta(
   goalId: string,
@@ -148,20 +148,40 @@ export async function applyGoalDelta(
   const now = new Date().toISOString();
 
   await runInExclusiveTransaction(db, async (txn) => {
-    // 1. Atomic SQL update to goal balance
-    const result = await txn.runAsync(
-      `UPDATE goals
-       SET current_amount_cents = current_amount_cents + ?,
-           updated_at = ?
-       WHERE id = ?;`,
-      [roundedDeltaCents, now, goalId]
+    // 1. Fetch current goal state
+    const goal = await txn.getFirstAsync<GoalRow>(
+      `SELECT * FROM goals WHERE id = ?;`,
+      [goalId]
     );
 
-    if (result.changes === 0) {
+    if (!goal) {
       throw new Error(`Goal with ID ${goalId} not found.`);
     }
 
-    // 2. Record contribution row
+    if (roundedDeltaCents < 0) {
+      const maxDeductibleCents = Math.floor(goal.current_amount_cents * 0.8);
+      if (Math.abs(roundedDeltaCents) > maxDeductibleCents) {
+        throw new Error(
+          "Cannot deduct more than 80% of goal funds. At least 20% must remain reserved to protect your savings momentum."
+        );
+      }
+    }
+
+    const newAmountCents = Math.max(0, goal.current_amount_cents + roundedDeltaCents);
+    const newStatus: GoalStatus =
+      newAmountCents >= goal.target_amount_cents ? "completed" : "active";
+
+    // 2. Atomic SQL update to goal balance & status
+    await txn.runAsync(
+      `UPDATE goals
+       SET current_amount_cents = ?,
+           status = ?,
+           updated_at = ?
+       WHERE id = ?;`,
+      [newAmountCents, newStatus, now, goalId]
+    );
+
+    // 3. Record contribution audit row
     await txn.runAsync(
       `INSERT INTO goal_contributions (
         id,
@@ -187,6 +207,24 @@ export async function applyGoalDelta(
     throw new Error(`Failed to fetch updated goal with ID: ${goalId}`);
   }
   return updatedGoal;
+}
+
+/**
+ * Withdraws funds from a goal balance, ensuring balance reduction and status reversion if below target.
+ */
+export async function withdrawFromGoal(
+  goalId: string,
+  amountCents: number,
+  transactionId?: string,
+  note?: string
+): Promise<GoalRow> {
+  const roundedCents = Math.round(Math.abs(amountCents));
+  return applyGoalDelta(
+    goalId,
+    -roundedCents,
+    transactionId,
+    note ?? "Goal withdrawal"
+  );
 }
 
 /**

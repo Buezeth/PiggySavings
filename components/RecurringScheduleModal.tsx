@@ -59,20 +59,31 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
     return categories.filter((c) => c.type === type);
   }, [categories, type]);
 
-  // Sync state with scheduleToEdit when modal opens or schedule changes
+  // Sync state when modal opens or scheduleToEdit changes
   useEffect(() => {
+    if (!visible) return;
+
     if (scheduleToEdit) {
       setType(scheduleToEdit.type);
       setTitle(scheduleToEdit.title);
-      setAmount((scheduleToEdit.amount_cents / 100).toFixed(activeCurrency.decimal_digits));
+      const decDigits = activeCurrency.decimal_digits;
+      setAmount(
+        decDigits === 0
+          ? String(scheduleToEdit.amount_cents)
+          : (scheduleToEdit.amount_cents / 100).toFixed(decDigits)
+      );
       setSelectedCategoryId(scheduleToEdit.category_id);
       setFrequency(scheduleToEdit.frequency);
-      if (scheduleToEdit.custom_interval_days) {
-        setCustomDays(String(scheduleToEdit.custom_interval_days));
-      }
-      if (scheduleToEdit.day_of_month) {
-        setDayOfMonth(String(scheduleToEdit.day_of_month));
-      }
+      setCustomDays(
+        scheduleToEdit.custom_interval_days
+          ? String(scheduleToEdit.custom_interval_days)
+          : "15"
+      );
+      setDayOfMonth(
+        scheduleToEdit.day_of_month
+          ? String(scheduleToEdit.day_of_month)
+          : String(new Date().getDate())
+      );
     } else {
       setType("expense");
       setTitle("");
@@ -80,22 +91,22 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
       setFrequency("monthly");
       setCustomDays("15");
       setDayOfMonth(String(new Date().getDate()));
-      if (matchingCategories.length > 0) {
-        setSelectedCategoryId(matchingCategories[0].id);
-      } else {
-        setSelectedCategoryId(null);
-      }
+      const firstExpense = categories.find((c) => c.type === "expense");
+      setSelectedCategoryId(firstExpense ? firstExpense.id : null);
     }
-  }, [scheduleToEdit, visible]);
+  }, [visible, scheduleToEdit, categories, activeCurrency.decimal_digits]);
 
-  // Default category on type change if not matching
+  // When type or matching categories change, ensure selectedCategoryId belongs to matchingCategories
   useEffect(() => {
+    if (!visible) return;
     if (matchingCategories.length > 0) {
       if (!selectedCategoryId || !matchingCategories.some((c) => c.id === selectedCategoryId)) {
         setSelectedCategoryId(matchingCategories[0].id);
       }
+    } else {
+      setSelectedCategoryId(null);
     }
-  }, [matchingCategories]);
+  }, [visible, matchingCategories, selectedCategoryId]);
 
   const handleSave = async () => {
     if (isSubmittingRef.current) return;

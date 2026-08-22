@@ -213,6 +213,146 @@ export async function processDueRecurringSchedules(): Promise<ProcessedScheduleR
 }
 
 /**
+ * Queries all active recurring schedules that are currently due for review / execution.
+ */
+export async function getPendingRecurringSchedules(): Promise<RecurringScheduleRow[]> {
+  const db = await getDatabase();
+  const todayStr = getLocalTodayStr();
+  return await db.getAllAsync<RecurringScheduleRow>(
+    `SELECT * FROM recurring_schedules 
+     WHERE next_occurrence <= ? AND is_active = 1 
+     ORDER BY next_occurrence ASC;`,
+    [todayStr]
+  );
+}
+
+/**
+ * Confirms and writes a single due recurring schedule to the ledger, optionally with an adjusted amount or date,
+ * and advances the schedule's next_occurrence.
+ */
+export async function confirmRecurringSchedule(
+  scheduleId: string,
+  customAmountCents?: number,
+  customDate?: string
+): Promise<{ transactionId: string; nextOccurrence: string; allocationSummary?: AutoAllocationSummary }> {
+  const db = await getDatabase();
+
+  return await runInExclusiveTransaction(db, async (txn) => {
+    const schedule = await txn.getFirstAsync<RecurringScheduleRow>(
+      `SELECT * FROM recurring_schedules WHERE id = ?;`,
+      [scheduleId]
+    );
+
+    if (!schedule) {
+      throw new Error(`Recurring schedule with ID ${scheduleId} not found.`);
+    }
+
+    const txId = Crypto.randomUUID();
+    const now = new Date().toISOString();
+    const finalAmountCents = customAmountCents !== undefined ? Math.round(customAmountCents) : schedule.amount_cents;
+    const finalDate = customDate ?? schedule.next_occurrence;
+    const idempotencyKey = `recurring_${schedule.id}_${schedule.next_occurrence}_${Date.now()}`;
+
+    // 1. Insert transaction
+    await txn.runAsync(
+      `INSERT INTO transactions (
+        id,
+        category_id,
+        type,
+        amount_cents,
+        note,
+        transaction_date,
+        idempotency_key,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      [
+        txId,
+        schedule.category_id,
+        schedule.type,
+        finalAmountCents,
+        `Recurring: ${schedule.title}`,
+        finalDate,
+        idempotencyKey,
+        now,
+      ]
+    );
+
+    // 2. If income and amount > 0, run auto-allocation engine
+    let allocationSummary: AutoAllocationSummary | undefined;
+    if (schedule.type === "income" && finalAmountCents > 0) {
+      allocationSummary = await evaluateAutoAllocations(
+        finalAmountCents,
+        schedule.category_id,
+        txId,
+        txn
+      );
+    }
+
+    // 3. Compute next occurrence date
+    const nextDateStr = calculateNextOccurrence(
+      schedule.next_occurrence,
+      schedule.frequency,
+      schedule.custom_interval_days,
+      schedule.day_of_month,
+      schedule.start_date
+    );
+
+    // 4. Update recurring schedule next_occurrence
+    await txn.runAsync(
+      `UPDATE recurring_schedules 
+       SET next_occurrence = ?
+       WHERE id = ?;`,
+      [nextDateStr, schedule.id]
+    );
+
+    return {
+      transactionId: txId,
+      nextOccurrence: nextDateStr,
+      allocationSummary,
+    };
+  });
+}
+
+/**
+ * Advances a recurring schedule's next_occurrence without writing a transaction to the ledger.
+ */
+export async function skipRecurringOccurrence(
+  scheduleId: string
+): Promise<{ nextOccurrence: string }> {
+  const db = await getDatabase();
+
+  return await runInExclusiveTransaction(db, async (txn) => {
+    const schedule = await txn.getFirstAsync<RecurringScheduleRow>(
+      `SELECT * FROM recurring_schedules WHERE id = ?;`,
+      [scheduleId]
+    );
+
+    if (!schedule) {
+      throw new Error(`Recurring schedule with ID ${scheduleId} not found.`);
+    }
+
+    const nextDateStr = calculateNextOccurrence(
+      schedule.next_occurrence,
+      schedule.frequency,
+      schedule.custom_interval_days,
+      schedule.day_of_month,
+      schedule.start_date
+    );
+
+    await txn.runAsync(
+      `UPDATE recurring_schedules 
+       SET next_occurrence = ?
+       WHERE id = ?;`,
+      [nextDateStr, schedule.id]
+    );
+
+    return {
+      nextOccurrence: nextDateStr,
+    };
+  });
+}
+
+/**
  * Clamps custom recurring days string/number to the inclusive 1–365 range.
  * Defaults to 15 if missing, NaN, or non-positive.
  */

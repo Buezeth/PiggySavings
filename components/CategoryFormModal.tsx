@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { getCurrency, parseCurrencyToCents } from "../constants/currencies";
 import {
   getIconById,
   ICON_REGISTRY,
@@ -48,25 +49,42 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
   const { height: screenHeight } = useWindowDimensions();
   const sheetHeight = Math.round(screenHeight * 0.88);
 
-  const { createCategory, updateCategory } = useApp();
+  const { currencyCode, currencySymbol, createCategory, updateCategory } = useApp();
 
   const isEditing = !!categoryToEdit;
+  const isDefault = categoryToEdit?.is_default === 1;
   const isSubmittingRef = useRef(false);
 
   // Form states
   const [name, setName] = useState("");
   const [type, setType] = useState<"income" | "expense">(defaultType);
+  const [monthlyBudget, setMonthlyBudget] = useState("");
   const [selectedPalette, setSelectedPalette] = useState<PaletteToken>("primary");
   const [selectedIcon, setSelectedIcon] = useState<IconDefinition>(ICON_REGISTRY[0]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isIconPickerOpen, setIsIconPickerOpen] = useState(false);
 
+  const activeCurrency = useMemo(() => getCurrency(currencyCode), [currencyCode]);
+
   useEffect(() => {
     if (visible) {
       if (categoryToEdit) {
         setName(categoryToEdit.name);
         setType(categoryToEdit.type);
+        if (
+          categoryToEdit.monthly_budget_cents !== null &&
+          categoryToEdit.monthly_budget_cents !== undefined
+        ) {
+          const cur = getCurrency(currencyCode);
+          const val =
+            cur.decimal_digits === 0
+              ? String(categoryToEdit.monthly_budget_cents)
+              : (categoryToEdit.monthly_budget_cents / 100).toFixed(cur.decimal_digits);
+          setMonthlyBudget(val);
+        } else {
+          setMonthlyBudget("");
+        }
         const palette =
           (categoryToEdit.color_code as PaletteToken) ||
           (categoryToEdit.type === "income" ? "emerald" : "primary");
@@ -87,6 +105,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       } else {
         setName("");
         setType(defaultType);
+        setMonthlyBudget("");
         setSelectedPalette(defaultType === "income" ? "emerald" : "primary");
         setSelectedIcon(
           defaultType === "income" ? getIconById("finance-salary") : ICON_REGISTRY[0]
@@ -95,7 +114,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       setError(null);
       setIsIconPickerOpen(false);
     }
-  }, [visible, categoryToEdit, defaultType]);
+  }, [visible, categoryToEdit, defaultType, currencyCode]);
 
   const activePalette = PALETTE_CONFIG[selectedPalette] || PALETTE_CONFIG.primary;
 
@@ -103,9 +122,23 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
     if (isSubmittingRef.current) return;
 
     const trimmedName = name.trim();
-    if (!trimmedName) {
+    if (!trimmedName && !isDefault) {
       setError("Please enter a category name.");
       return;
+    }
+
+    let parsedBudgetCents: number | null = null;
+    if (type === "expense" && monthlyBudget.trim()) {
+      const parsed = parseCurrencyToCents(monthlyBudget, currencyCode);
+      if (!parsed) {
+        setError("Please enter a valid monthly budget limit.");
+        return;
+      }
+      if (parsed.error) {
+        setError(parsed.error);
+        return;
+      }
+      parsedBudgetCents = parsed.cents;
     }
 
     try {
@@ -116,13 +149,21 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
       let resultCategory: CategoryRow | null = null;
 
       if (isEditing && categoryToEdit) {
-        resultCategory = await updateCategory(categoryToEdit.id, {
-          name: trimmedName,
-          ...(type !== categoryToEdit.type ? { type } : {}),
-          icon_name: selectedIcon.name,
-          icon_family: selectedIcon.family,
-          color_code: selectedPalette,
-        });
+        if (isDefault) {
+          // Default categories: only update monthly budget limit
+          resultCategory = await updateCategory(categoryToEdit.id, {
+            monthly_budget_cents: parsedBudgetCents,
+          });
+        } else {
+          resultCategory = await updateCategory(categoryToEdit.id, {
+            name: trimmedName,
+            ...(type !== categoryToEdit.type ? { type } : {}),
+            icon_name: selectedIcon.name,
+            icon_family: selectedIcon.family,
+            color_code: selectedPalette,
+            monthly_budget_cents: parsedBudgetCents,
+          });
+        }
       } else {
         resultCategory = await createCategory({
           name: trimmedName,
@@ -130,6 +171,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           icon_name: selectedIcon.name,
           icon_family: selectedIcon.family,
           color_code: selectedPalette,
+          monthly_budget_cents: parsedBudgetCents,
         });
       }
 
@@ -173,13 +215,13 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               <View className="flex-row items-center gap-2">
                 <View className="w-8 h-8 rounded-full bg-coral-subtle border border-border-card items-center justify-center mr-2">
                   <Ionicons
-                    name="pricetag-outline"
+                    name={isDefault ? "speedometer-outline" : "pricetag-outline"}
                     size={16}
                     color={colors.primary}
                   />
                 </View>
                 <Text className="text-text-main text-lg font-black tracking-tight">
-                  {isEditing ? "Edit Category" : "New Category"}
+                  {isDefault ? "Set Budget Limit 🎯" : isEditing ? "Edit Category" : "New Category"}
                 </Text>
               </View>
 
@@ -200,6 +242,23 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ gap: 14 }}
             >
+              {/* DEFAULT CATEGORY NOTICE */}
+              {isDefault && (
+                <View className="bg-coral-subtle p-3.5 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark flex-row items-center">
+                  <View className="w-8 h-8 rounded-xl bg-primary/10 items-center justify-center mr-2.5">
+                    <Ionicons name="lock-closed" size={16} color={colors.primary} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-text-main text-xs font-black">
+                      System Default Category
+                    </Text>
+                    <Text className="text-text-muted text-[11px] font-bold">
+                      Name, type, and icons are fixed. You can configure your monthly envelope spending limit below.
+                    </Text>
+                  </View>
+                </View>
+              )}
+
               {/* LIVE CARD PREVIEW */}
               <View className="items-center">
                 <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2 self-start">
@@ -238,165 +297,202 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </View>
               </View>
 
-              {/* SEGMENTED SWITCH: INCOME VS EXPENSE */}
-              <View>
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Category Type
-                </Text>
-                <View className="flex-row bg-bg-card p-1.5 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark">
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setType("income");
-                      if (selectedPalette === "primary" || selectedPalette === "rose") {
-                        setSelectedPalette("emerald");
-                      }
-                    }}
-                    className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "income"
-                        ? "bg-emerald border-emerald-light border-b-emerald-dark"
-                        : "bg-transparent border-transparent border-b-transparent"
-                      }`}
-                  >
-                    <Ionicons
-                      name="arrow-up-circle"
-                      size={18}
-                      color={type === "income" ? colors.white : colors.textMuted}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      className={`will-change-variable text-xs font-black ${type === "income" ? "text-white" : "text-text-muted"
-                        }`}
-                    >
-                      Income
+              {/* CUSTOM CATEGORY EDITABLE FIELDS */}
+              {!isDefault && (
+                <>
+                  {/* SEGMENTED SWITCH: INCOME VS EXPENSE */}
+                  <View>
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                      Category Type
                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => {
-                      setType("expense");
-                      if (selectedPalette === "emerald") {
-                        setSelectedPalette("primary");
-                      }
-                    }}
-                    className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "expense"
-                        ? "bg-rose border-rose-light border-b-rose-dark"
-                        : "bg-transparent border-transparent border-b-transparent"
-                      }`}
-                  >
-                    <Ionicons
-                      name="arrow-down-circle"
-                      size={18}
-                      color={type === "expense" ? colors.white : colors.textMuted}
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
-                        }`}
-                    >
-                      Expense
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* NAME INPUT */}
-              <View>
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Category Name
-                </Text>
-                <View className="bg-bg-card rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark px-3.5 py-2.5">
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="e.g. Subscriptions, Side Hustle..."
-                    placeholderTextColor={colors.textMuted}
-                    className="text-sm font-bold text-text-main py-0"
-                    maxLength={30}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              {/* PALETTE SELECTOR */}
-              <View>
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Color Theme
-                </Text>
-                <View className="flex-row justify-between gap-2">
-                  {PALETTE_OPTIONS.map((token) => {
-                    const cfg = PALETTE_CONFIG[token];
-                    const isSelected = selectedPalette === token;
-
-                    return (
+                    <View className="flex-row bg-bg-card p-1.5 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark">
                       <TouchableOpacity
-                        key={token}
                         activeOpacity={0.8}
-                        onPress={() => setSelectedPalette(token)}
-                        className={`will-change-variable flex-1 aspect-square rounded-2xl items-center justify-center border-2 border-b-4 ${cfg.bgClass} ${cfg.borderClass} ${isSelected ? "opacity-100" : "opacity-60"
+                        onPress={() => {
+                          setType("income");
+                          if (selectedPalette === "primary" || selectedPalette === "rose") {
+                            setSelectedPalette("emerald");
+                          }
+                        }}
+                        className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "income"
+                            ? "bg-emerald border-emerald-light border-b-emerald-dark"
+                            : "bg-transparent border-transparent border-b-transparent"
                           }`}
                       >
-                        {isSelected && (
-                          <View className="w-6 h-6 rounded-full bg-white-overlay-30 items-center justify-center">
-                            <Ionicons name="checkmark" size={16} color={colors.white} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* ICON PICKER TRIGGER */}
-              <View>
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Icon
-                </Text>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setIsIconPickerOpen(true)}
-                  className="bg-bg-card p-3 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark flex-row items-center justify-between"
-                >
-                  <View className="flex-row items-center gap-3">
-                    <View
-                      className={`will-change-variable w-10 h-10 rounded-xl items-center justify-center mr-2 ${activePalette.badgeBgClass}`}
-                    >
-                      {selectedIcon.family === "Ionicons" ? (
                         <Ionicons
-                          name={selectedIcon.name}
-                          size={20}
-                          color={activePalette.colorCode}
+                          name="arrow-up-circle"
+                          size={18}
+                          color={type === "income" ? colors.white : colors.textMuted}
+                          style={{ marginRight: 6 }}
                         />
-                      ) : (
-                        <MaterialCommunityIcons
-                          name={selectedIcon.name}
-                          size={20}
-                          color={activePalette.colorCode}
+                        <Text
+                          className={`will-change-variable text-xs font-black ${type === "income" ? "text-white" : "text-text-muted"
+                            }`}
+                        >
+                          Income
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setType("expense");
+                          if (selectedPalette === "emerald") {
+                            setSelectedPalette("primary");
+                          }
+                        }}
+                        className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "expense"
+                            ? "bg-rose border-rose-light border-b-rose-dark"
+                            : "bg-transparent border-transparent border-b-transparent"
+                          }`}
+                      >
+                        <Ionicons
+                          name="arrow-down-circle"
+                          size={18}
+                          color={type === "expense" ? colors.white : colors.textMuted}
+                          style={{ marginRight: 6 }}
                         />
-                      )}
-                    </View>
-                    <View>
-                      <Text className="text-text-main font-black text-sm">
-                        {selectedIcon.label}
-                      </Text>
-                      <Text className="text-text-muted font-bold text-xs">
-                        Domain: {selectedIcon.domain}
-                      </Text>
+                        <Text
+                          className={`will-change-variable text-xs font-black ${type === "expense" ? "text-white" : "text-text-muted"
+                            }`}
+                        >
+                          Expense
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
-                  <View className="flex-row items-center">
-                    <Text className="text-primary font-bold text-xs mr-1">
-                      Change
+                  {/* NAME INPUT */}
+                  <View>
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                      Category Name
                     </Text>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={16}
-                      color={colors.primary}
+                    <View className="bg-bg-card rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark px-3.5 py-2.5">
+                      <TextInput
+                        value={name}
+                        onChangeText={setName}
+                        placeholder="e.g. Subscriptions, Side Hustle..."
+                        placeholderTextColor={colors.textMuted}
+                        className="text-sm font-bold text-text-main py-0"
+                        maxLength={30}
+                        autoCapitalize="words"
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
+
+              {/* MONTHLY BUDGET LIMIT (OPTIONAL) - ONLY FOR EXPENSE CATEGORIES */}
+              {type === "expense" && (
+                <View>
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider">
+                      Monthly Budget Limit (Optional)
+                    </Text>
+                    <Text className="text-text-muted text-[11px] font-bold">
+                      Spending Envelope
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center bg-bg-card rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark px-3.5 py-2">
+                    <Text className="text-primary font-black text-base mr-2">
+                      {currencySymbol.trim()}
+                    </Text>
+                    <TextInput
+                      value={monthlyBudget}
+                      onChangeText={setMonthlyBudget}
+                      placeholder={activeCurrency.decimal_digits === 0 ? "40000" : "400.00"}
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="decimal-pad"
+                      className="flex-1 text-sm font-bold text-text-main py-0"
                     />
                   </View>
-                </TouchableOpacity>
-              </View>
+                </View>
+              )}
+
+              {/* PALETTE & ICON SELECTORS - ONLY FOR CUSTOM CATEGORIES */}
+              {!isDefault && (
+                <>
+                  {/* PALETTE SELECTOR */}
+                  <View>
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                      Color Theme
+                    </Text>
+                    <View className="flex-row justify-between gap-2">
+                      {PALETTE_OPTIONS.map((token) => {
+                        const cfg = PALETTE_CONFIG[token];
+                        const isSelected = selectedPalette === token;
+
+                        return (
+                          <TouchableOpacity
+                            key={token}
+                            activeOpacity={0.8}
+                            onPress={() => setSelectedPalette(token)}
+                            className={`will-change-variable flex-1 aspect-square rounded-2xl items-center justify-center border-2 border-b-4 ${cfg.bgClass} ${cfg.borderClass} ${isSelected ? "opacity-100" : "opacity-60"
+                              }`}
+                          >
+                            {isSelected && (
+                              <View className="w-6 h-6 rounded-full bg-white-overlay-30 items-center justify-center">
+                                <Ionicons name="checkmark" size={16} color={colors.white} />
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* ICON PICKER TRIGGER */}
+                  <View>
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                      Icon
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setIsIconPickerOpen(true)}
+                      className="bg-bg-card p-3 rounded-2xl border-2 border-border-card border-b-4 border-b-border-card-dark flex-row items-center justify-between"
+                    >
+                      <View className="flex-row items-center gap-3">
+                        <View
+                          className={`will-change-variable w-10 h-10 rounded-xl items-center justify-center mr-2 ${activePalette.badgeBgClass}`}
+                        >
+                          {selectedIcon.family === "Ionicons" ? (
+                            <Ionicons
+                              name={selectedIcon.name}
+                              size={20}
+                              color={activePalette.colorCode}
+                            />
+                          ) : (
+                            <MaterialCommunityIcons
+                              name={selectedIcon.name}
+                              size={20}
+                              color={activePalette.colorCode}
+                            />
+                          )}
+                        </View>
+                        <View>
+                          <Text className="text-text-main font-black text-sm">
+                            {selectedIcon.label}
+                          </Text>
+                          <Text className="text-text-muted font-bold text-xs">
+                            Domain: {selectedIcon.domain}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View className="flex-row items-center">
+                        <Text className="text-primary font-bold text-xs mr-1">
+                          Change
+                        </Text>
+                        <Ionicons
+                          name="chevron-forward"
+                          size={16}
+                          color={colors.primary}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
 
               {/* ERROR BANNER */}
               {error && (
@@ -426,7 +522,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                         style={{ marginRight: 8 }}
                       />
                       <Text className="text-white font-black text-base tracking-wide">
-                        {isEditing ? "Save Changes" : "Create Category"}
+                        {isDefault ? "Save Budget Limit 🎯" : isEditing ? "Save Changes" : "Create Category"}
                       </Text>
                     </>
                   )}

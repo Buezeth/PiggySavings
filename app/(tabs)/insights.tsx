@@ -1,14 +1,29 @@
-import CartoonCard from "@/components/CartoonCard";
+import { CartoonCard } from "@/components/CartoonCard";
+import { CategoryManagerModal } from "@/components/CategoryManagerModal";
+import { getCurrency } from "@/constants/currencies";
+import { PALETTE_CONFIG, PaletteToken } from "@/constants/iconRegistry";
 import { colors } from "@/constants/theme";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useMemo } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useApp } from "@/context/AppContext";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import React, { useMemo, useState } from "react";
+import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function InsightsScreen() {
   const insets = useSafeAreaInsets();
-  const { goals, transactions, cashflowSummary, getGoalContributions, fetchTransactions, formatMoney } = useApp();
+  const {
+    goals,
+    transactions,
+    cashflowSummary,
+    spendableCashSummary,
+    categoryBudgetSummaries,
+    currencyCode,
+    getGoalContributions,
+    fetchTransactions,
+    formatMoney,
+  } = useApp();
+
+  const [isCategoryManagerVisible, setIsCategoryManagerVisible] = useState(false);
 
   // Metrics Transaction History (Complete date-bounded window, not limited to 50 items)
   const [historyTransactions, setHistoryTransactions] = React.useState(transactions);
@@ -214,6 +229,26 @@ export default function InsightsScreen() {
 
   const velocityFormatted = formatMoney(past30DaysVelocityCents);
 
+  const dynamicBenchmarkCents = useMemo(() => {
+    const totalGoalTargets = goals.reduce((sum, g) => sum + (g.target_amount_cents || 0), 0);
+    const monthlyGoalTarget = Math.round(totalGoalTargets / 12);
+    const monthlyIncome = cashflowSummary.totalIncomeCents;
+    const activeCurrency = getCurrency(currencyCode);
+
+    // Minimum baseline of 500 main currency units (50,000 cents or 500 for zero-decimal)
+    const minBaseline = activeCurrency.decimal_digits === 0 ? 500 : 50000;
+    return Math.max(monthlyIncome, monthlyGoalTarget, minBaseline);
+  }, [goals, cashflowSummary, currencyCode]);
+
+  const velocityPercent = Math.min(
+    100,
+    Math.max(0, Math.round((Math.max(0, past30DaysVelocityCents) / dynamicBenchmarkCents) * 100))
+  );
+
+  const budgetedCategories = useMemo(() => {
+    return categoryBudgetSummaries.filter((b) => b.budgetCents > 0);
+  }, [categoryBudgetSummaries]);
+
   return (
     <View style={{ paddingTop: Math.max(insets.top, 16) }} className="flex-1 bg-bg-app">
       <ScrollView
@@ -231,6 +266,52 @@ export default function InsightsScreen() {
             Insights & Nudges 📊
           </Text>
         </View>
+
+        {/* ─── SECTION 1: SPENDABLE CASH BREAKDOWN CARD ─── */}
+        <CartoonCard className="mb-6 p-5">
+          <View className="flex-row items-center justify-between mb-3">
+            <View className="flex-row items-center">
+              <View className="w-8 h-8 rounded-xl bg-coral-subtle items-center justify-center mr-2">
+                <Ionicons name="wallet-outline" size={16} color={colors.primary} />
+              </View>
+              <Text className="text-text-main text-base font-black">
+                Spendable Cash Breakdown
+              </Text>
+            </View>
+            <View className="bg-coral-subtle px-2.5 py-0.5 rounded-full border border-border-card">
+              <Text className="text-primary text-[11px] font-black uppercase">Live</Text>
+            </View>
+          </View>
+
+          <View className="flex-row gap-2.5 pt-1">
+            <View className="flex-1 bg-emerald-subtle p-3 rounded-2xl border border-emerald-border">
+              <Text className="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">
+                Total Inflow
+              </Text>
+              <Text className="text-emerald text-sm font-black" numberOfLines={1}>
+                {formatMoney(spendableCashSummary.totalIncomeCents)}
+              </Text>
+            </View>
+
+            <View className="flex-1 bg-gold-subtle p-3 rounded-2xl border border-gold-border">
+              <Text className="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">
+                Goal Reserved
+              </Text>
+              <Text className="text-gold-dark text-sm font-black" numberOfLines={1}>
+                {formatMoney(spendableCashSummary.totalGoalReservedCents)}
+              </Text>
+            </View>
+
+            <View className="flex-1 bg-coral-subtle p-3 rounded-2xl border border-primary-light">
+              <Text className="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">
+                Free Spendable
+              </Text>
+              <Text className="text-primary text-sm font-black" numberOfLines={1}>
+                {formatMoney(spendableCashSummary.unallocatedSpendableCents)}
+              </Text>
+            </View>
+          </View>
+        </CartoonCard>
 
         {/* Smart Nudge Banner */}
         <CartoonCard variant="subtle" className="mb-6 p-5 flex-row items-start">
@@ -279,15 +360,7 @@ export default function InsightsScreen() {
           <View className="h-3 bg-bg-app rounded-full overflow-hidden mb-3 border border-border-card">
             <View
               style={{
-                width: `${Math.min(
-                  Math.max(
-                    Math.round(
-                      (Math.max(0, past30DaysVelocityCents) / (1000 * 100 || 1)) * 100
-                    ),
-                    0
-                  ),
-                  100
-                )}%`,
+                width: `${velocityPercent}%`,
               }}
               className="h-full bg-primary rounded-full"
             />
@@ -352,6 +425,136 @@ export default function InsightsScreen() {
           </CartoonCard>
         </View>
 
+        {/* ─── SECTION 2: MONTHLY CATEGORY BUDGETS (ENVELOPE VIEW) ─── */}
+        <View className="mb-6">
+          <View className="flex-row items-center justify-between mb-3">
+            <View className="flex-row items-center">
+              <View className="w-8 h-8 rounded-xl bg-coral-subtle items-center justify-center mr-2">
+                <Ionicons name="pricetags-outline" size={16} color={colors.primary} />
+              </View>
+              <Text className="text-text-main text-lg font-black tracking-tight">
+                Monthly Category Budgets 🏷️
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => setIsCategoryManagerVisible(true)}
+              className="bg-coral-subtle px-3 py-1.5 rounded-full border border-border-card flex-row items-center"
+            >
+              <Ionicons name="settings-outline" size={12} color={colors.primary} />
+              <Text className="text-primary text-xs font-black ml-1">
+                Manage
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {budgetedCategories.length === 0 ? (
+            <CartoonCard className="p-5 items-center">
+              <View className="w-12 h-12 rounded-2xl bg-coral-subtle items-center justify-center mb-2">
+                <Ionicons name="pie-chart-outline" size={24} color={colors.primary} />
+              </View>
+              <Text className="text-text-main text-sm font-black mb-1">
+                No Category Budgets Set
+              </Text>
+              <Text className="text-text-muted text-xs font-bold text-center mb-4">
+                Set monthly spending limits for expense categories to track your envelopes in real-time.
+              </Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsCategoryManagerVisible(true)}
+                className="bg-primary px-4 py-2.5 rounded-2xl border-2 border-primary-light border-b-4 border-b-primary-dark flex-row items-center"
+              >
+                <Ionicons name="add-circle" size={16} color={colors.white} />
+                <Text className="text-white text-xs font-black ml-1.5 uppercase">
+                  + Set Category Budgets
+                </Text>
+              </TouchableOpacity>
+            </CartoonCard>
+          ) : (
+            <View style={{ gap: 12 }}>
+              {budgetedCategories.map((budget) => {
+                const paletteToken = (budget.colorCode as PaletteToken) || "primary";
+                const palette = PALETTE_CONFIG[paletteToken] || PALETTE_CONFIG.primary;
+                const percentage = budget.percentageUsed;
+                const isOver = budget.isOverBudget;
+                const overAmount = budget.spentCents - budget.budgetCents;
+
+                let pacingBarClass = "bg-emerald";
+                let pacingTextClass = "text-emerald";
+                if (percentage >= 100) {
+                  pacingBarClass = "bg-rose";
+                  pacingTextClass = "text-rose";
+                } else if (percentage >= 75) {
+                  pacingBarClass = "bg-gold";
+                  pacingTextClass = "text-gold-dark";
+                }
+
+                return (
+                  <CartoonCard key={budget.categoryId} className="p-4">
+                    <View className="flex-row items-center justify-between mb-2.5">
+                      <View className="flex-row items-center flex-1 mr-2">
+                        <View
+                          className={`will-change-variable w-10 h-10 rounded-2xl items-center justify-center mr-3 border-2 border-b-4 ${palette.bgSubtleClass} ${palette.borderClass}`}
+                        >
+                          {budget.iconFamily === "MaterialCommunityIcons" ? (
+                            <MaterialCommunityIcons
+                              name={(budget.iconName as any) || "tag-outline"}
+                              size={18}
+                              color={palette.colorCode}
+                            />
+                          ) : (
+                            <Ionicons
+                              name={(budget.iconName as any) || "pricetag-outline"}
+                              size={18}
+                              color={palette.colorCode}
+                            />
+                          )}
+                        </View>
+                        <View className="flex-1">
+                          <Text className="text-text-main text-sm font-black">
+                            {budget.categoryName}
+                          </Text>
+                          <Text className="text-text-muted text-xs font-bold mt-0.5">
+                            Spent {formatMoney(budget.spentCents)} of {formatMoney(budget.budgetCents)}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View className="items-end">
+                        <Text className={`will-change-variable text-sm font-black ${pacingTextClass}`}>
+                          {percentage}%
+                        </Text>
+                        <Text className="text-text-muted text-[10px] font-bold">
+                          {isOver ? "Over Limit" : `${formatMoney(budget.remainingCents)} left`}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Progress Bar */}
+                    <View className="h-2.5 bg-bg-app rounded-full overflow-hidden mb-1 border border-border-card">
+                      <View
+                        style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
+                        className={`will-change-variable h-full rounded-full ${pacingBarClass}`}
+                      />
+                    </View>
+
+                    {/* Over Budget Banner */}
+                    {isOver && (
+                      <View className="mt-2 bg-rose-subtle px-3 py-1.5 rounded-xl border border-rose-border flex-row items-center">
+                        <Ionicons name="warning" size={14} color={colors.rose} />
+                        <Text className="text-rose-dark text-xs font-black ml-1.5">
+                          ⚠️ Over budget by {formatMoney(overAmount)}
+                        </Text>
+                      </View>
+                    )}
+                  </CartoonCard>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         {/* Smart Tips / Gamified Challenge Card */}
         <CartoonCard variant="accent" className="p-5 mb-4">
           <View className="flex-row items-center justify-between mb-2">
@@ -370,6 +573,12 @@ export default function InsightsScreen() {
           </Text>
         </CartoonCard>
       </ScrollView>
+
+      {/* Category Manager Modal Sibling */}
+      <CategoryManagerModal
+        visible={isCategoryManagerVisible}
+        onClose={() => setIsCategoryManagerVisible(false)}
+      />
     </View>
   );
 }
