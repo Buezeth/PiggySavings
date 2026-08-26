@@ -422,6 +422,10 @@ export async function updateTransaction(
       return null;
     }
 
+    if (input.amount_cents !== undefined && input.amount_cents < 0) {
+      throw new Error("Transaction amount cannot be negative.");
+    }
+
     const newAmountCents =
       input.amount_cents !== undefined
         ? Math.round(input.amount_cents)
