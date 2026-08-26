@@ -165,7 +165,13 @@ export async function insertTransaction(
 
     // 2. If goal allocation specified, update goal balance and insert contribution
     if (goalAllocation && goalAllocation.amount_cents > 0) {
+      if (tx.type !== "income") {
+        throw new Error("Goal allocations can only be attached to income transactions.");
+      }
       const roundedGoalCents = Math.round(goalAllocation.amount_cents);
+      if (roundedGoalCents > roundedAmountCents) {
+        throw new Error("Goal allocation amount cannot exceed the transaction amount.");
+      }
       const contributionId = goalAllocation.idempotency_key;
 
       const targetGoal = await txn.getFirstAsync<GoalRow>(
@@ -180,7 +186,12 @@ export async function insertTransaction(
       }
 
       const newBal = targetGoal.current_amount_cents + roundedGoalCents;
-      const newStatus: GoalStatus = newBal >= targetGoal.target_amount_cents ? "completed" : "active";
+      const newStatus: GoalStatus =
+        targetGoal.status === "archived"
+          ? "archived"
+          : newBal >= targetGoal.target_amount_cents
+          ? "completed"
+          : "active";
 
       await txn.runAsync(
         `UPDATE goals
@@ -421,7 +432,7 @@ export async function updateTransaction(
         : existing.source_goal_id;
 
     // 1. Reconcile source_goal_id changes (expense funded by goal)
-    if (existing.source_goal_id !== newSourceGoalId || existing.amount_cents !== newAmountCents) {
+    if (existing.type === "expense" && (existing.source_goal_id !== newSourceGoalId || existing.amount_cents !== newAmountCents)) {
       // If previous transaction had a source goal, restore previous amount
       if (existing.source_goal_id) {
         const oldGoal = await txn.getFirstAsync<GoalRow>(
@@ -443,44 +454,54 @@ export async function updateTransaction(
         }
       }
 
-      // If new source goal is specified, deduct new amount
+      // If new source goal is specified, validate and deduct new amount
       if (newSourceGoalId) {
         const newGoal = await txn.getFirstAsync<GoalRow>(
           `SELECT * FROM goals WHERE id = ?;`,
           [newSourceGoalId]
         );
-        if (newGoal) {
-          const deductedBal = Math.max(0, newGoal.current_amount_cents - newAmountCents);
-          const deductedStatus: GoalStatus =
-            newGoal.status === "archived"
-              ? "archived"
-              : deductedBal >= newGoal.target_amount_cents
-              ? "completed"
-              : "active";
-          await txn.runAsync(
-            `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
-            [deductedBal, deductedStatus, now, newSourceGoalId]
+        if (!newGoal) {
+          throw new Error(`Source goal with ID ${newSourceGoalId} not found.`);
+        }
+        const maxDeductibleCents = Math.floor(newGoal.current_amount_cents * 0.8);
+        if (newAmountCents > maxDeductibleCents) {
+          throw new Error(
+            "Cannot deduct more than 80% of goal funds. At least 20% must remain reserved to protect your savings momentum."
           );
         }
+        const deductedBal = Math.max(0, newGoal.current_amount_cents - newAmountCents);
+        const deductedStatus: GoalStatus =
+          newGoal.status === "archived"
+            ? "archived"
+            : deductedBal >= newGoal.target_amount_cents
+            ? "completed"
+            : "active";
+        await txn.runAsync(
+          `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
+          [deductedBal, deductedStatus, now, newSourceGoalId]
+        );
       }
     }
 
     // 2. Reconcile goal_contributions (income allocated to goal)
-    if (existing.amount_cents !== newAmountCents) {
+    if (existing.type === "income" && existing.amount_cents !== newAmountCents) {
       const contributions = await txn.getAllAsync<{ id: string; goal_id: string; amount_cents: number }>(
-        `SELECT id, goal_id, amount_cents FROM goal_contributions WHERE transaction_id = ?;`,
+        `SELECT id, goal_id, amount_cents FROM goal_contributions WHERE transaction_id = ? AND amount_cents > 0;`,
         [id]
       );
 
-      const diff = newAmountCents - existing.amount_cents;
-      for (const contrib of contributions) {
+      // If exactly one positive goal allocation exists and matches or scales with transaction amount
+      if (contributions.length === 1) {
+        const contrib = contributions[0];
         const goal = await txn.getFirstAsync<GoalRow>(
           `SELECT * FROM goals WHERE id = ?;`,
           [contrib.goal_id]
         );
         if (goal) {
-          const updatedContrib = Math.max(0, contrib.amount_cents + diff);
-          const newBal = Math.max(0, goal.current_amount_cents + diff);
+          const diff = newAmountCents - existing.amount_cents;
+          const updatedContrib = Math.min(newAmountCents, Math.max(0, contrib.amount_cents + diff));
+          const actualDiff = updatedContrib - contrib.amount_cents;
+          const newBal = Math.max(0, goal.current_amount_cents + actualDiff);
           const newStatus: GoalStatus =
             goal.status === "archived"
               ? "archived"
