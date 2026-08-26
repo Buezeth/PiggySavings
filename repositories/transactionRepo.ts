@@ -498,8 +498,7 @@ export async function updateTransaction(
           [contrib.goal_id]
         );
         if (goal) {
-          const diff = newAmountCents - existing.amount_cents;
-          const updatedContrib = Math.min(newAmountCents, Math.max(0, contrib.amount_cents + diff));
+          const updatedContrib = Math.min(contrib.amount_cents, newAmountCents);
           const actualDiff = updatedContrib - contrib.amount_cents;
           const newBal = Math.max(0, goal.current_amount_cents + actualDiff);
           const newStatus: GoalStatus =
