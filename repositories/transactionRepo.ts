@@ -490,31 +490,40 @@ export async function updateTransaction(
         [id]
       );
 
-      // If exactly one positive goal allocation exists and matches or scales with transaction amount
-      if (contributions.length === 1) {
-        const contrib = contributions[0];
-        const goal = await txn.getFirstAsync<GoalRow>(
-          `SELECT * FROM goals WHERE id = ?;`,
-          [contrib.goal_id]
-        );
-        if (goal) {
-          const updatedContrib = Math.min(contrib.amount_cents, newAmountCents);
-          const actualDiff = updatedContrib - contrib.amount_cents;
-          const newBal = Math.max(0, goal.current_amount_cents + actualDiff);
-          const newStatus: GoalStatus =
-            goal.status === "archived"
-              ? "archived"
-              : newBal >= goal.target_amount_cents
-              ? "completed"
-              : "active";
-          await txn.runAsync(
-            `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
-            [newBal, newStatus, now, contrib.goal_id]
-          );
-          await txn.runAsync(
-            `UPDATE goal_contributions SET amount_cents = ? WHERE id = ?;`,
-            [updatedContrib, contrib.id]
-          );
+      const totalAllocatedCents = contributions.reduce((sum, c) => sum + c.amount_cents, 0);
+
+      if (totalAllocatedCents > 0) {
+        if (newAmountCents < totalAllocatedCents) {
+          if (contributions.length === 1) {
+            const contrib = contributions[0];
+            const goal = await txn.getFirstAsync<GoalRow>(
+              `SELECT * FROM goals WHERE id = ?;`,
+              [contrib.goal_id]
+            );
+            if (goal) {
+              const updatedContrib = newAmountCents;
+              const actualDiff = updatedContrib - contrib.amount_cents;
+              const newBal = Math.max(0, goal.current_amount_cents + actualDiff);
+              const newStatus: GoalStatus =
+                goal.status === "archived"
+                  ? "archived"
+                  : newBal >= goal.target_amount_cents
+                  ? "completed"
+                  : "active";
+              await txn.runAsync(
+                `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
+                [newBal, newStatus, now, contrib.goal_id]
+              );
+              await txn.runAsync(
+                `UPDATE goal_contributions SET amount_cents = ? WHERE id = ?;`,
+                [updatedContrib, contrib.id]
+              );
+            }
+          } else {
+            throw new Error(
+              `Cannot reduce transaction amount to ${newAmountCents} cents: total allocated to savings goals is ${totalAllocatedCents} cents. Please adjust goal contributions first.`
+            );
+          }
         }
       }
     }
