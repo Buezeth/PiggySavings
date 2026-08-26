@@ -14,11 +14,13 @@ import {
   getCurrencySymbol,
 } from "../constants/currencies";
 import {
+  CategoryBudgetSummary,
   CreateCategoryInput,
   createCustomCategory as createCustomCategoryInRepo,
   deleteCategory as deleteCategoryInRepo,
   DeleteCategoryResult,
   getAllCategories,
+  getCategoryBudgetSummaries,
   UpdateCategoryInput,
   updateCategory as updateCategoryInRepo,
 } from "../repositories/categoryRepo";
@@ -33,7 +35,8 @@ import {
   getActiveGoals,
   getGoalContributions as getGoalContributionsInRepo,
   UpdateGoalInput,
-  updateGoal as updateGoalInRepo
+  updateGoal as updateGoalInRepo,
+  withdrawFromGoal as withdrawFromGoalInRepo,
 } from "../repositories/goalRepo";
 import {
   CreateRecurringScheduleInput,
@@ -44,7 +47,12 @@ import {
   getRecurringSchedules,
   toggleRecurringSchedule as toggleRecurringScheduleInRepo,
 } from "../repositories/recurringRepo";
-import { processDueRecurringSchedules } from "../services/recurring/recurringEngine";
+import {
+  confirmRecurringSchedule as confirmRecurringScheduleInEngine,
+  getPendingRecurringSchedules,
+  processDueRecurringSchedules,
+  skipRecurringOccurrence as skipRecurringOccurrenceInEngine,
+} from "../services/recurring/recurringEngine";
 import {
   CashflowSummary,
   EnrichedTransactionRow,
@@ -53,6 +61,8 @@ import {
   GoalAllocationInput,
   InsertTransactionInput,
   insertTransaction as insertTransactionInRepo,
+  deleteTransaction as deleteTransactionInRepo,
+  updateTransaction as updateTransactionInRepo,
   TransactionFilterOptions,
 } from "../repositories/transactionRepo";
 import {
@@ -65,22 +75,34 @@ import {
   GoalContributionRow,
   GoalRow,
   RecurringScheduleRow,
+  TransactionRow,
+  UpdateTransactionInput,
   UserEntitlementRow,
   UserPreferenceRow,
 } from "../services/db/types";
 import { createGuardedGoal } from "../services/monetization/entitlementGuard";
+
+export interface SpendableCashSummary {
+  totalIncomeCents: number;
+  totalExpenseCents: number;
+  totalGoalReservedCents: number;
+  unallocatedSpendableCents: number; // Income - Expense - Active Goal Balances
+}
 
 interface AppContextType {
   // Reactive States
   goals: GoalRow[];
   transactions: EnrichedTransactionRow[];
   cashflowSummary: CashflowSummary;
+  spendableCashSummary: SpendableCashSummary;
   entitlements: UserEntitlementRow;
   preferences: UserPreferenceRow;
   currencyCode: string;
   currencySymbol: string;
   categories: CategoryRow[];
+  categoryBudgetSummaries: CategoryBudgetSummary[];
   recurringSchedules: RecurringScheduleRow[];
+  pendingRecurringSchedules: RecurringScheduleRow[];
   isLoading: boolean;
   isReady: boolean;
   error: string | null;
@@ -95,12 +117,19 @@ interface AppContextType {
     goalAllocation?: GoalAllocationInput,
     recurringSchedule?: CreateRecurringScheduleInput
   ) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<boolean>;
+  updateTransaction: (id: string, input: UpdateTransactionInput) => Promise<TransactionRow | null>;
   createGoal: (goal: CreateGoalInput) => Promise<GoalRow>;
   updateGoal: (id: string, fields: UpdateGoalInput) => Promise<GoalRow | null>;
   contributeToGoal: (
     goalId: string,
     deltaCents: number,
     transactionId?: string,
+    note?: string
+  ) => Promise<GoalRow>;
+  withdrawFromGoal: (
+    goalId: string,
+    amountCents: number,
     note?: string
   ) => Promise<GoalRow>;
   getGoalContributions: (
@@ -113,6 +142,8 @@ interface AppContextType {
   deleteRecurring: (id: string) => Promise<void>;
   createRecurringSchedule: (input: CreateRecurringScheduleInput) => Promise<RecurringScheduleRow>;
   updateRecurringSchedule: (id: string, input: UpdateRecurringScheduleInput) => Promise<RecurringScheduleRow | null>;
+  confirmRecurringSchedule: (id: string, amountCents?: number, date?: string) => Promise<void>;
+  skipRecurringOccurrence: (id: string) => Promise<void>;
   createCategory: (input: CreateCategoryInput) => Promise<CategoryRow>;
   updateCategory: (id: string, fields: UpdateCategoryInput) => Promise<CategoryRow | null>;
   deleteCategory: (id: string, reassignToCategoryId?: string) => Promise<DeleteCategoryResult>;
@@ -152,7 +183,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [preferences, setPreferences] =
     useState<UserPreferenceRow>(createDefaultPreferences);
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [categoryBudgetSummaries, setCategoryBudgetSummaries] = useState<CategoryBudgetSummary[]>([]);
   const [recurringSchedules, setRecurringSchedules] = useState<RecurringScheduleRow[]>([]);
+  const [pendingRecurringSchedules, setPendingRecurringSchedules] = useState<RecurringScheduleRow[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +195,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => getCurrencySymbol(currencyCode),
     [currencyCode]
   );
+
+  const spendableCashSummary = useMemo<SpendableCashSummary>(() => {
+    const totalIncomeCents = cashflowSummary.totalIncomeCents;
+    const totalExpenseCents = cashflowSummary.totalExpenseCents;
+    const totalGoalReservedCents = goals
+      .filter((g) => g.status === "active")
+      .reduce((acc, g) => acc + (g.current_amount_cents || 0), 0);
+    const unallocatedSpendableCents = totalIncomeCents - totalExpenseCents - totalGoalReservedCents;
+
+    return {
+      totalIncomeCents,
+      totalExpenseCents,
+      totalGoalReservedCents,
+      unallocatedSpendableCents,
+    };
+  }, [cashflowSummary, goals]);
 
   // Monotonically increasing generation ref to track latest refreshData invocation
   const refreshGenerationRef = useRef(0);
@@ -187,7 +236,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         fetchedEntitlements,
         fetchedPreferences,
         fetchedCategories,
+        fetchedBudgets,
         fetchedRecurring,
+        fetchedPendingRecurring,
       ] = await Promise.all([
         getActiveGoals(),
         getTransactions({ limit: 50 }),
@@ -195,7 +246,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         getUserEntitlements(),
         getUserPreferences(),
         getAllCategories(),
+        getCategoryBudgetSummaries(),
         getRecurringSchedules(),
+        getPendingRecurringSchedules(),
       ]);
 
       // Only update state if this is still the most recent refresh invocation
@@ -206,6 +259,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setEntitlements(fetchedEntitlements);
         setPreferences(fetchedPreferences);
         setCategories(fetchedCategories);
+        setCategoryBudgetSummaries(fetchedBudgets);
+        setPendingRecurringSchedules(fetchedPendingRecurring);
         if (recurringMutationRevisionRef.current === capturedRecurringRevision) {
           setRecurringSchedules(fetchedRecurring);
         }
@@ -250,6 +305,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ) => {
       await insertTransactionInRepo(tx, goalAllocation, recurringSchedule);
       await refreshData();
+    },
+    [refreshData]
+  );
+
+  /**
+   * Delete a transaction with atomic balance rollbacks and refresh app state.
+   */
+  const deleteTransaction = useCallback(
+    async (id: string): Promise<boolean> => {
+      const success = await deleteTransactionInRepo(id);
+      if (success) {
+        await refreshData();
+      }
+      return success;
+    },
+    [refreshData]
+  );
+
+  /**
+   * Update transaction metadata and reconcile goal balances.
+   */
+  const updateTransaction = useCallback(
+    async (id: string, input: UpdateTransactionInput): Promise<TransactionRow | null> => {
+      const updated = await updateTransactionInRepo(id, input);
+      if (updated) {
+        await refreshData();
+      }
+      return updated;
     },
     [refreshData]
   );
@@ -301,9 +384,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setGoals((prev) =>
         prev.map((g) => (g.id === goalId ? updated : g))
       );
+      await refreshData();
       return updated;
     },
-    []
+    [refreshData]
+  );
+
+  /**
+   * Withdraw from a goal balance and refresh app state.
+   */
+  const withdrawFromGoal = useCallback(
+    async (
+      goalId: string,
+      amountCents: number,
+      note?: string
+    ): Promise<GoalRow> => {
+      const updated = await withdrawFromGoalInRepo(
+        goalId,
+        amountCents,
+        undefined,
+        note
+      );
+      setGoals((prev) =>
+        prev.map((g) => (g.id === goalId ? updated : g))
+      );
+      await refreshData();
+      return updated;
+    },
+    [refreshData]
   );
 
   /**
@@ -381,31 +489,50 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Foreground listener to automatically process due recurring transactions and refresh UI state
+   * Foreground listener to refresh pending recurring schedules without silent auto-insertion
    */
-  const isProcessingForegroundRef = useRef(false);
+  const isRefreshingForegroundRef = useRef(false);
 
   useEffect(() => {
     const subscription = AppState.addEventListener(
       "change",
       async (state: AppStateStatus) => {
-        if (state === "active" && !isProcessingForegroundRef.current) {
-          isProcessingForegroundRef.current = true;
+        if (state === "active" && !isRefreshingForegroundRef.current) {
+          isRefreshingForegroundRef.current = true;
           try {
-            const processed = await processDueRecurringSchedules();
-            if (processed && processed.length > 0) {
-              await refreshData();
-            }
+            await refreshData();
           } catch (err) {
-            console.error("Foreground recurring schedule processing error:", err);
+            console.error("Foreground refresh error:", err);
           } finally {
-            isProcessingForegroundRef.current = false;
+            isRefreshingForegroundRef.current = false;
           }
         }
       }
     );
     return () => subscription.remove();
   }, [refreshData]);
+
+  /**
+   * Confirms a due recurring schedule and logs the transaction.
+   */
+  const confirmRecurringSchedule = useCallback(
+    async (id: string, amountCents?: number, date?: string) => {
+      await confirmRecurringScheduleInEngine(id, amountCents, date);
+      await refreshData();
+    },
+    [refreshData]
+  );
+
+  /**
+   * Skips a due recurring occurrence without logging a transaction.
+   */
+  const skipRecurringOccurrence = useCallback(
+    async (id: string) => {
+      await skipRecurringOccurrenceInEngine(id);
+      await refreshData();
+    },
+    [refreshData]
+  );
 
   /**
    * Fetch goal contributions for a specific goal.
@@ -487,12 +614,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       goals,
       transactions,
       cashflowSummary,
+      spendableCashSummary,
       entitlements,
       preferences,
       currencyCode,
       currencySymbol,
       categories,
+      categoryBudgetSummaries,
       recurringSchedules,
+      pendingRecurringSchedules,
       isLoading,
       isReady,
       error,
@@ -501,9 +631,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       formatMoney,
       fetchTransactions,
       addTransaction,
+      deleteTransaction,
+      updateTransaction,
       createGoal,
       updateGoal,
       contributeToGoal,
+      withdrawFromGoal,
       getGoalContributions,
       unlockGoalSlot,
       setSupporterStatus,
@@ -511,6 +644,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteRecurring,
       createRecurringSchedule,
       updateRecurringSchedule: updateRecurring,
+      confirmRecurringSchedule,
+      skipRecurringOccurrence,
       createCategory,
       updateCategory,
       deleteCategory,
@@ -519,12 +654,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       goals,
       transactions,
       cashflowSummary,
+      spendableCashSummary,
       entitlements,
       preferences,
       currencyCode,
       currencySymbol,
       categories,
+      categoryBudgetSummaries,
       recurringSchedules,
+      pendingRecurringSchedules,
       isLoading,
       isReady,
       error,
@@ -533,9 +671,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       formatMoney,
       fetchTransactions,
       addTransaction,
+      deleteTransaction,
+      updateTransaction,
       createGoal,
       updateGoal,
       contributeToGoal,
+      withdrawFromGoal,
       getGoalContributions,
       unlockGoalSlot,
       setSupporterStatus,
@@ -543,6 +684,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteRecurring,
       createRecurringSchedule,
       updateRecurring,
+      confirmRecurringSchedule,
+      skipRecurringOccurrence,
       createCategory,
       updateCategory,
       deleteCategory,

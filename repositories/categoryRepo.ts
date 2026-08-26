@@ -8,6 +8,7 @@ export interface CreateCategoryInput {
   icon_name?: string | null;
   icon_family?: string | null;
   color_code?: string | null;
+  monthly_budget_cents?: number | null;
 }
 
 export interface UpdateCategoryInput {
@@ -16,12 +17,27 @@ export interface UpdateCategoryInput {
   icon_name?: string | null;
   icon_family?: string | null;
   color_code?: string | null;
+  monthly_budget_cents?: number | null;
 }
 
 export interface CategoryUsageCount {
   transactionCount: number;
   scheduleCount: number;
   allocationCount: number;
+}
+
+export interface CategoryBudgetSummary {
+  categoryId: string;
+  categoryName: string;
+  type: "income" | "expense";
+  iconName?: string | null;
+  iconFamily?: string | null;
+  colorCode?: string | null;
+  budgetCents: number;
+  spentCents: number;
+  remainingCents: number;
+  percentageUsed: number;
+  isOverBudget: boolean;
 }
 
 export interface DeleteCategoryResult {
@@ -80,10 +96,15 @@ export async function createCustomCategory(
     throw new Error("Category name cannot be empty.");
   }
 
+  const budgetCents =
+    input.monthly_budget_cents !== undefined && input.monthly_budget_cents !== null
+      ? Math.max(0, Math.round(input.monthly_budget_cents))
+      : null;
+
   try {
     await db.runAsync(
-      `INSERT INTO categories (id, name, type, icon_name, icon_family, color_code, is_default)
-       VALUES (?, ?, ?, ?, ?, ?, 0);`,
+      `INSERT INTO categories (id, name, type, icon_name, icon_family, color_code, monthly_budget_cents, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0);`,
       [
         id,
         name,
@@ -91,6 +112,7 @@ export async function createCustomCategory(
         input.icon_name ?? null,
         input.icon_family ?? null,
         input.color_code ?? null,
+        budgetCents,
       ]
     );
   } catch (err: any) {
@@ -121,8 +143,26 @@ export async function updateCategory(
     throw new Error(`Category with ID "${id}" does not exist.`);
   }
 
+  if (existing.is_default === 1 && fields.type !== undefined && fields.type !== existing.type) {
+    throw new Error("System default category type cannot be modified.");
+  }
+
   if (existing.is_default === 1) {
-    throw new Error("System default categories cannot be modified.");
+    if (fields.name !== undefined && fields.name.trim() !== existing.name) {
+      throw new Error("System default category names cannot be modified.");
+    }
+    if (fields.type !== undefined && fields.type !== existing.type) {
+      throw new Error("System default category types cannot be modified.");
+    }
+    if (fields.icon_name !== undefined && fields.icon_name !== existing.icon_name) {
+      throw new Error("System default category icons cannot be modified.");
+    }
+    if (fields.color_code !== undefined && fields.color_code !== existing.color_code) {
+      throw new Error("System default category color themes cannot be modified.");
+    }
+    if (existing.type === "income" && fields.monthly_budget_cents !== undefined && fields.monthly_budget_cents !== null) {
+      throw new Error("Income categories cannot have budget limits.");
+    }
   }
 
   if (fields.type !== undefined && fields.type !== existing.type) {
@@ -162,6 +202,14 @@ export async function updateCategory(
     setClauses.push("color_code = ?");
     values.push(fields.color_code);
   }
+  if (fields.monthly_budget_cents !== undefined) {
+    setClauses.push("monthly_budget_cents = ?");
+    values.push(
+      fields.monthly_budget_cents !== null
+        ? Math.max(0, Math.round(fields.monthly_budget_cents))
+        : null
+    );
+  }
 
   if (setClauses.length === 0) {
     return existing;
@@ -184,6 +232,79 @@ export async function updateCategory(
   }
 
   return getCategoryById(id);
+}
+
+/**
+ * Computes monthly envelope budget progress and pacing summaries for expense categories.
+ * Evaluates spending for the given yearMonth ('YYYY-MM', defaults to current local calendar month).
+ */
+export async function getCategoryBudgetSummaries(
+  yearMonth?: string
+): Promise<CategoryBudgetSummary[]> {
+  const db = await getDatabase();
+  const currentYM =
+    yearMonth ??
+    (() => {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      return `${y}-${m}`;
+    })();
+
+  const rows = await db.getAllAsync<{
+    id: string;
+    name: string;
+    type: "income" | "expense";
+    icon_name: string | null;
+    icon_family: string | null;
+    color_code: string | null;
+    monthly_budget_cents: number | null;
+    spent_cents: number;
+  }>(
+    `SELECT 
+       c.id, 
+       c.name, 
+       c.type, 
+       c.icon_name, 
+       c.icon_family, 
+       c.color_code, 
+       c.monthly_budget_cents, 
+       COALESCE(SUM(t.amount_cents), 0) as spent_cents 
+     FROM categories c 
+     LEFT JOIN transactions t 
+       ON c.id = t.category_id 
+       AND t.type = 'expense' 
+       AND strftime('%Y-%m', t.transaction_date) = ? 
+     WHERE c.type = 'expense' 
+     GROUP BY c.id 
+     ORDER BY 
+       CASE WHEN c.monthly_budget_cents IS NOT NULL AND c.monthly_budget_cents > 0 THEN 0 ELSE 1 END,
+       c.monthly_budget_cents DESC, 
+       c.name ASC;`,
+    [currentYM]
+  );
+
+  return rows.map((r) => {
+    const budgetCents = r.monthly_budget_cents ?? 0;
+    const spentCents = r.spent_cents ?? 0;
+    const remainingCents = budgetCents > 0 ? budgetCents - spentCents : 0;
+    const percentageUsed = budgetCents > 0 ? Math.round((spentCents / budgetCents) * 100) : 0;
+    const isOverBudget = budgetCents > 0 && spentCents > budgetCents;
+
+    return {
+      categoryId: r.id,
+      categoryName: r.name,
+      type: r.type,
+      iconName: r.icon_name,
+      iconFamily: r.icon_family,
+      colorCode: r.color_code,
+      budgetCents,
+      spentCents,
+      remainingCents,
+      percentageUsed,
+      isOverBudget,
+    };
+  });
 }
 
 /**

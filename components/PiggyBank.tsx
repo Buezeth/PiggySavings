@@ -53,7 +53,7 @@ export const PiggyBank: React.FC<PiggyBankProps> = ({
                 true
             );
         }
-    }, [animated]);
+    }, [animated, translateY, scale]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [

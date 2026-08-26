@@ -59,43 +59,59 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
     return categories.filter((c) => c.type === type);
   }, [categories, type]);
 
-  // Sync state with scheduleToEdit when modal opens or schedule changes
+  const prevTypeRef = useRef<"income" | "expense">(type);
+
+  // Sync state when modal opens or scheduleToEdit changes
   useEffect(() => {
+    if (!visible) return;
+
     if (scheduleToEdit) {
       setType(scheduleToEdit.type);
+      prevTypeRef.current = scheduleToEdit.type;
       setTitle(scheduleToEdit.title);
-      setAmount((scheduleToEdit.amount_cents / 100).toFixed(activeCurrency.decimal_digits));
+      const decDigits = activeCurrency.decimal_digits;
+      setAmount(
+        decDigits === 0
+          ? String(scheduleToEdit.amount_cents)
+          : (scheduleToEdit.amount_cents / 100).toFixed(decDigits)
+      );
       setSelectedCategoryId(scheduleToEdit.category_id);
       setFrequency(scheduleToEdit.frequency);
-      if (scheduleToEdit.custom_interval_days) {
-        setCustomDays(String(scheduleToEdit.custom_interval_days));
-      }
-      if (scheduleToEdit.day_of_month) {
-        setDayOfMonth(String(scheduleToEdit.day_of_month));
-      }
+      setCustomDays(
+        scheduleToEdit.custom_interval_days
+          ? String(scheduleToEdit.custom_interval_days)
+          : "15"
+      );
+      setDayOfMonth(
+        scheduleToEdit.day_of_month
+          ? String(scheduleToEdit.day_of_month)
+          : String(new Date().getDate())
+      );
     } else {
       setType("expense");
+      prevTypeRef.current = "expense";
       setTitle("");
       setAmount("");
       setFrequency("monthly");
       setCustomDays("15");
       setDayOfMonth(String(new Date().getDate()));
+      const firstExpense = categories.find((c) => c.type === "expense");
+      setSelectedCategoryId(firstExpense ? firstExpense.id : null);
+    }
+  }, [visible, scheduleToEdit, categories, activeCurrency.decimal_digits]);
+
+  // When type changes, ensure selectedCategoryId belongs to matchingCategories
+  useEffect(() => {
+    if (!visible) return;
+    if (prevTypeRef.current !== type) {
+      prevTypeRef.current = type;
       if (matchingCategories.length > 0) {
         setSelectedCategoryId(matchingCategories[0].id);
       } else {
         setSelectedCategoryId(null);
       }
     }
-  }, [scheduleToEdit, visible]);
-
-  // Default category on type change if not matching
-  useEffect(() => {
-    if (matchingCategories.length > 0) {
-      if (!selectedCategoryId || !matchingCategories.some((c) => c.id === selectedCategoryId)) {
-        setSelectedCategoryId(matchingCategories[0].id);
-      }
-    }
-  }, [matchingCategories]);
+  }, [visible, type, matchingCategories]);
 
   const handleSave = async () => {
     if (isSubmittingRef.current) return;

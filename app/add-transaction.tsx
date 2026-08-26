@@ -1,5 +1,5 @@
-import CartoonCard from "@/components/CartoonCard";
-import CategoryFormModal from "@/components/CategoryFormModal";
+import { CartoonCard } from "@/components/CartoonCard";
+import { CategoryFormModal } from "@/components/CategoryFormModal";
 import { getCurrency, parseCurrencyToCents } from "@/constants/currencies";
 import { PALETTE_CONFIG, PaletteToken } from "@/constants/iconRegistry";
 import { colors } from "@/constants/theme";
@@ -38,13 +38,20 @@ const generateUUIDv4 = (): string => {
 export default function AddTransactionModal() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { goals, categories, currencyCode, currencySymbol, addTransaction } = useApp();
+  const { goals, categories, currencyCode, currencySymbol, formatMoney, addTransaction } = useApp();
 
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+
+  // Partial Income Allocation State
+  const [allocationType, setAllocationType] = useState<"10%" | "20%" | "50%" | "100%" | "custom">("100%");
+  const [customAllocationAmount, setCustomAllocationAmount] = useState("");
+
+  // Goal-Funded Expense State
+  const [selectedSourceGoalId, setSelectedSourceGoalId] = useState<string | null>(null);
 
   // Category creation modal state
   const [isCategoryModalVisible, setIsCategoryModalVisible] = useState(false);
@@ -68,6 +75,53 @@ export default function AddTransactionModal() {
     return categories.filter((c) => c.type === type);
   }, [categories, type]);
 
+  // Total transaction amount in cents
+  const totalAmountCents = useMemo(() => {
+    const parsed = parseCurrencyToCents(amount, currencyCode);
+    return parsed?.cents && parsed.cents > 0 ? parsed.cents : 0;
+  }, [amount, currencyCode]);
+
+  // Selected goals helpers
+  const selectedGoal = useMemo(() => {
+    return goals.find((g) => g.id === selectedGoalId) ?? null;
+  }, [goals, selectedGoalId]);
+
+  const selectedSourceGoal = useMemo(() => {
+    return goals.find((g) => g.id === selectedSourceGoalId) ?? null;
+  }, [goals, selectedSourceGoalId]);
+
+  // Calculate allocated goal cents and remaining spendable cash
+  const allocatedGoalCents = useMemo(() => {
+    if (type !== "income" || !selectedGoalId || totalAmountCents <= 0) {
+      return 0;
+    }
+    let rawCents = 0;
+    switch (allocationType) {
+      case "10%":
+        rawCents = Math.round(totalAmountCents * 0.1);
+        break;
+      case "20%":
+        rawCents = Math.round(totalAmountCents * 0.2);
+        break;
+      case "50%":
+        rawCents = Math.round(totalAmountCents * 0.5);
+        break;
+      case "100%":
+        rawCents = totalAmountCents;
+        break;
+      case "custom": {
+        const parsedCustom = parseCurrencyToCents(customAllocationAmount, currencyCode);
+        rawCents = parsedCustom?.cents ? parsedCustom.cents : 0;
+        break;
+      }
+    }
+    return Math.min(totalAmountCents, Math.max(0, rawCents));
+  }, [type, selectedGoalId, totalAmountCents, allocationType, customAllocationAmount, currencyCode]);
+
+  const remainingSpendableCents = useMemo(() => {
+    return Math.max(0, totalAmountCents - allocatedGoalCents);
+  }, [totalAmountCents, allocatedGoalCents]);
+
   // Set default category when type changes or preserve valid selection
   React.useEffect(() => {
     if (matchingCategories.length > 0) {
@@ -77,7 +131,7 @@ export default function AddTransactionModal() {
     } else {
       setSelectedCategoryId(null);
     }
-  }, [matchingCategories]);
+  }, [matchingCategories, selectedCategoryId]);
 
   // Listen for keyboard dismiss to reset scroll headroom
   React.useEffect(() => {
@@ -115,6 +169,21 @@ export default function AddTransactionModal() {
     }
 
     const amountInCents = parsedResult.cents;
+
+    // Validate 20% goal reserve protection rule if funded by a savings goal
+    if (type === "expense" && selectedSourceGoalId && selectedSourceGoal) {
+      const currentGoalCents = selectedSourceGoal.current_amount_cents || 0;
+      const maxDeductibleCents = Math.floor(currentGoalCents * 0.8);
+      const minReserveCents = currentGoalCents - maxDeductibleCents;
+
+      if (amountInCents > maxDeductibleCents) {
+        Alert.alert(
+          "Goal Reserve Protected 🛡️",
+          `You can deduct a maximum of ${formatMoney(maxDeductibleCents)} from "${selectedSourceGoal.title}". At least 20% (${formatMoney(minReserveCents)}) must remain reserved to protect your savings momentum.`
+        );
+        return;
+      }
+    }
 
     const categoryId = matchingCategories.some(
       (category) => category.id === selectedCategoryId
@@ -154,11 +223,12 @@ export default function AddTransactionModal() {
           note: note.trim() || (type === "income" ? "Income Deposit" : "Expense"),
           transaction_date: transactionDate,
           idempotency_key: idempotencyKey,
+          source_goal_id: type === "expense" ? selectedSourceGoalId : undefined,
         },
-        type === "income" && selectedGoalId
+        type === "income" && selectedGoalId && allocatedGoalCents > 0
           ? {
               goal_id: selectedGoalId,
-              amount_cents: amountInCents,
+              amount_cents: allocatedGoalCents,
               note: note.trim() || "Auto-allocated from quick transaction",
               idempotency_key: generateUUIDv4(),
             }
@@ -365,7 +435,7 @@ export default function AddTransactionModal() {
               <Text className="text-text-main text-sm font-black mb-2">
                 Target Goal Auto-Allocation (Optional)
               </Text>
-              <View className="flex-row flex-wrap gap-2 mb-5">
+              <View className="flex-row flex-wrap gap-2 mb-3">
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setSelectedGoalId(null)}
@@ -408,7 +478,160 @@ export default function AddTransactionModal() {
                   );
                 })}
               </View>
+
+              {/* Partial Allocation Selector (when goal is selected) */}
+              {selectedGoalId !== null && (
+                <View className="mb-5">
+                  <Text className="text-text-muted text-xs font-bold uppercase tracking-wider mb-2">
+                    Allocation Split
+                  </Text>
+
+                  {/* Tactile Split Pills */}
+                  <View className="flex-row flex-wrap gap-2 mb-3">
+                    {(["10%", "20%", "50%", "100%", "custom"] as const).map((split) => {
+                      const isSelected = allocationType === split;
+                      const label = split === "custom" ? "Custom $" : split;
+                      return (
+                        <TouchableOpacity
+                          key={split}
+                          activeOpacity={0.8}
+                          onPress={() => setAllocationType(split)}
+                          className={`will-change-variable px-3.5 py-1.5 rounded-2xl border-2 ${
+                            isSelected
+                              ? "bg-primary border-primary-light border-b-4 border-b-primary-dark"
+                              : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                          }`}
+                        >
+                          <Text
+                            className={`will-change-variable text-xs font-black ${
+                              isSelected ? "text-white" : "text-text-main"
+                            }`}
+                          >
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* Custom Allocation Amount Input */}
+                  {allocationType === "custom" && (
+                    <View className="flex-row items-center bg-bg-card rounded-2xl px-4 py-2.5 mb-3 border-2 border-border-card border-b-4 border-b-border-card-dark">
+                      <Text className="text-primary font-black text-base mr-1.5">
+                        {currencySymbol.trim()}
+                      </Text>
+                      <TextInput
+                        value={customAllocationAmount}
+                        onChangeText={setCustomAllocationAmount}
+                        placeholder={activeCurrency.decimal_digits === 0 ? "0" : "0.00"}
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="decimal-pad"
+                        className="flex-1 text-sm text-text-main font-black"
+                      />
+                    </View>
+                  )}
+
+                  {/* Live Feedback Banner */}
+                  <CartoonCard variant="subtle" className="p-3.5">
+                    <Text className="text-text-main text-xs font-bold leading-5">
+                      💡 <Text className="text-primary font-black">{formatMoney(allocatedGoalCents)}</Text> will go to 🎯 <Text className="font-black">{selectedGoal?.title}</Text> • <Text className="text-emerald font-black">{formatMoney(remainingSpendableCents)}</Text> stays as Spendable Cash
+                    </Text>
+                  </CartoonCard>
+                </View>
+              )}
             </>
+          )}
+
+          {/* Goal-Funded Expense Selector (Expense Mode with active goals) */}
+          {type === "expense" && goals.length > 0 && (
+            <View className="mb-5">
+              <Text className="text-text-main text-sm font-black mb-2">
+                Funded From Savings Goal? (Optional)
+              </Text>
+              <View className="flex-row flex-wrap gap-2 mb-3">
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setSelectedSourceGoalId(null)}
+                  className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
+                    selectedSourceGoalId === null
+                      ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                      : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                  }`}
+                >
+                  <Text
+                    className={`will-change-variable text-xs font-black ${
+                      selectedSourceGoalId === null ? "text-primary" : "text-text-muted"
+                    }`}
+                  >
+                    Regular Cashflow
+                  </Text>
+                </TouchableOpacity>
+
+                {goals.map((g) => {
+                  const isSelected = selectedSourceGoalId === g.id;
+                  return (
+                    <TouchableOpacity
+                      key={g.id}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedSourceGoalId(g.id)}
+                      className={`will-change-variable px-3.5 py-2 rounded-2xl border-2 ${
+                        isSelected
+                          ? "bg-coral-subtle border-primary border-b-4 border-b-primary-dark"
+                          : "bg-bg-card border-border-card border-b-4 border-b-border-card-dark"
+                      }`}
+                    >
+                      <Text
+                        className={`will-change-variable text-xs font-black ${
+                          isSelected ? "text-primary" : "text-text-main"
+                        }`}
+                      >
+                        🎯 {g.title} ({formatMoney(g.current_amount_cents)})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Goal-Funded 20% Reserve Safeguard Banner */}
+              {selectedSourceGoalId !== null && selectedSourceGoal && (() => {
+                const currentGoalCents = selectedSourceGoal.current_amount_cents || 0;
+                const maxDeductibleCents = Math.floor(currentGoalCents * 0.8);
+                const minReserveCents = currentGoalCents - maxDeductibleCents;
+                const parsedEntered = parseCurrencyToCents(amount, currencyCode);
+                const enteredCents = parsedEntered?.cents || 0;
+                const isOverLimit = enteredCents > maxDeductibleCents;
+
+                if (isOverLimit) {
+                  return (
+                    <CartoonCard variant="expense" className="p-3.5 flex-row items-start">
+                      <Ionicons name="warning" size={18} color={colors.rose} style={{ marginTop: 2, marginRight: 8 }} />
+                      <View className="flex-1">
+                        <Text className="text-rose-dark text-xs font-black mb-0.5">
+                          Deduction Limit Exceeded
+                        </Text>
+                        <Text className="text-text-main text-xs font-bold leading-4">
+                          You can deduct at most <Text className="text-rose font-black">{formatMoney(maxDeductibleCents)}</Text> (80%) from &apos;{selectedSourceGoal.title}&apos;. At least <Text className="font-black text-rose">{formatMoney(minReserveCents)}</Text> (20%) must remain reserved.
+                        </Text>
+                      </View>
+                    </CartoonCard>
+                  );
+                }
+
+                return (
+                  <CartoonCard variant="gold" className="p-3.5 flex-row items-start">
+                    <Ionicons name="shield-checkmark" size={18} color={colors.goldDark} style={{ marginTop: 2, marginRight: 8 }} />
+                    <View className="flex-1">
+                      <Text className="text-gold-dark text-xs font-black mb-0.5">
+                        20% Goal Reserve Protected
+                      </Text>
+                      <Text className="text-text-main text-xs font-bold leading-4">
+                        Deducting from <Text className="font-black text-gold-dark">{selectedSourceGoal.title}</Text>. You can use up to <Text className="font-black text-text-main">{formatMoney(maxDeductibleCents)}</Text>. A minimum reserve of <Text className="font-black text-gold-dark">{formatMoney(minReserveCents)}</Text> (20%) remains locked to protect your savings momentum.
+                      </Text>
+                    </View>
+                  </CartoonCard>
+                );
+              })()}
+            </View>
           )}
 
           {/* Description / Note */}

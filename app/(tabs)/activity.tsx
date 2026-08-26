@@ -1,17 +1,23 @@
-import CartoonCard from "@/components/CartoonCard";
+import { CartoonCard } from "@/components/CartoonCard";
+import { PendingRecurringBanner } from "@/components/PendingRecurringBanner";
+import { RecurringReviewModal } from "@/components/RecurringReviewModal";
+import { TransactionDetailModal } from "@/components/TransactionDetailModal";
 import { colors } from "@/constants/theme";
+import { useApp } from "@/context/AppContext";
+import { EnrichedTransactionRow } from "@/repositories/transactionRepo";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useApp } from "@/context/AppContext";
 
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
-  const { transactions, cashflowSummary, formatMoney } = useApp();
+  const { transactions, cashflowSummary, pendingRecurringSchedules, formatMoney } = useApp();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
+  const [selectedTransaction, setSelectedTransaction] = useState<EnrichedTransactionRow | null>(null);
+  const [isReviewModalVisible, setIsReviewModalVisible] = useState(false);
 
   const totalIncomeFormatted = formatMoney(cashflowSummary.totalIncomeCents);
   const totalExpenseFormatted = formatMoney(cashflowSummary.totalExpenseCents);
@@ -103,6 +109,16 @@ export default function ActivityScreen() {
           </CartoonCard>
         </View>
 
+        {/* ─── PENDING RECURRING REVIEW BANNER ─── */}
+        {pendingRecurringSchedules.length > 0 && (
+          <View className="mb-4">
+            <PendingRecurringBanner
+              pendingRecurringSchedules={pendingRecurringSchedules}
+              onPress={() => setIsReviewModalVisible(true)}
+            />
+          </View>
+        )}
+
         {/* Search Bar */}
         <View className="bg-bg-card rounded-2xl px-4 py-2.5 flex-row items-center border-2 border-border-card border-b-4 border-b-border-card-dark mb-3">
           <Ionicons name="search-outline" size={18} color={colors.textMuted} />
@@ -186,6 +202,8 @@ export default function ActivityScreen() {
               <CartoonCard
                 key={item.id}
                 variant={variant}
+                interactive={true}
+                onPress={() => setSelectedTransaction(item)}
                 className="mb-3.5 p-4 flex-row items-center justify-between"
               >
                 <View className="flex-row items-center flex-1 pr-2">
@@ -207,6 +225,23 @@ export default function ActivityScreen() {
                     <Text className="text-text-muted text-xs font-bold mt-0.5">
                       {item.category_name || "General"} • {formatDateLabel(item.transaction_date)}
                     </Text>
+
+                    {/* Goal Linkage Subtitle Badges */}
+                    {!!item.allocated_goal_title && (
+                      <View className="flex-row items-center mt-1 bg-gold-subtle px-2 py-0.5 rounded-md self-start border border-gold-border">
+                        <Text className="text-gold-dark text-[10px] font-black">
+                          🎯 ➔ {item.allocated_goal_title}
+                        </Text>
+                      </View>
+                    )}
+
+                    {!!item.source_goal_title && (
+                      <View className="flex-row items-center mt-1 bg-coral-subtle px-2 py-0.5 rounded-md self-start border border-border-card">
+                        <Text className="text-text-brand text-[10px] font-black">
+                          🛡️ Paid from {item.source_goal_title}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
 
@@ -222,6 +257,19 @@ export default function ActivityScreen() {
           })
         )}
       </ScrollView>
+
+      {/* Transaction Detail, Edit & Delete Modal */}
+      <TransactionDetailModal
+        visible={!!selectedTransaction}
+        transaction={selectedTransaction}
+        onClose={() => setSelectedTransaction(null)}
+      />
+
+      {/* Recurring Bills Review Modal */}
+      <RecurringReviewModal
+        visible={isReviewModalVisible}
+        onClose={() => setIsReviewModalVisible(false)}
+      />
     </View>
   );
 }
