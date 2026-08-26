@@ -77,10 +77,9 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
           categoryToEdit.monthly_budget_cents !== undefined
         ) {
           const cur = getCurrency(currencyCode);
-          const val =
-            cur.decimal_digits === 0
-              ? String(categoryToEdit.monthly_budget_cents)
-              : (categoryToEdit.monthly_budget_cents / 100).toFixed(cur.decimal_digits);
+          const val = (categoryToEdit.monthly_budget_cents / 100).toFixed(
+            Math.min(cur.decimal_digits, 2)
+          );
           setMonthlyBudget(val);
         } else {
           setMonthlyBudget("");

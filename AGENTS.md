@@ -62,7 +62,7 @@ All agentic decisions, component implementations, schemas, and features **MUST**
   - The app must **never** mislead the user into believing money locked in savings goals is free unallocated cash available to spend.
 - **Bi-Directional Goal Flow**:
   - **Inflow (Partial Allocations)**: When logging income, users can split allocations to active goals using presets (`10%`, `20%`, `50%`, `100%`, or custom amounts) rather than forcing 100% of the transaction amount.
-  - **Outflow (Goal Realization & Withdrawals)**: When an expense is funded by a savings goal (e.g. buying flights saved under "Japan Trip"), the transaction references `source_goal_id`, deducting from that goal's balance while categorizing the expense.
+  - **Outflow (Goal Realization & Withdrawals)**: When an expense is funded by a savings goal (e.g. buying flights saved under "Japan Trip"), the transaction references `source_goal_id`, deducting from that goal's balance while categorizing the expense. Goal-funded expenses and withdrawals must not exceed 80% of the associated goal balance (at least 20% must remain reserved to protect savings momentum).
 
 ### 3. Transaction Lifecycle & Reversible Mutations
 - **Full CRUD & Interactivity**: Every transaction in the ledger can be viewed in detail, edited, or deleted.

@@ -1,5 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -50,6 +50,7 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
   // Per-schedule custom amount inputs
   const [editedAmounts, setEditedAmounts] = useState<Record<string, string>>({});
   const [processingScheduleId, setProcessingScheduleId] = useState<string | null>(null);
+  const isProcessingRef = useRef(false);
 
   const getInitialAmountText = (schedule: RecurringScheduleRow): string => {
     if (editedAmounts[schedule.id] !== undefined) {
@@ -66,7 +67,7 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
   };
 
   const handleConfirm = async (schedule: RecurringScheduleRow) => {
-    if (processingScheduleId) return;
+    if (isProcessingRef.current) return;
 
     const amountText = getInitialAmountText(schedule);
     const parsed = parseCurrencyToCents(amountText, currencyCode);
@@ -81,17 +82,19 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
     }
 
     try {
+      isProcessingRef.current = true;
       setProcessingScheduleId(schedule.id);
       await confirmRecurringSchedule(schedule.id, parsed.cents);
     } catch (err: any) {
       Alert.alert("Error", err?.message || "Failed to confirm recurring bill.");
     } finally {
+      isProcessingRef.current = false;
       setProcessingScheduleId(null);
     }
   };
 
   const handleSkip = async (schedule: RecurringScheduleRow) => {
-    if (processingScheduleId) return;
+    if (isProcessingRef.current) return;
 
     Alert.alert(
       "Skip Occurrence",
@@ -102,12 +105,15 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
           text: "Skip",
           style: "destructive",
           onPress: async () => {
+            if (isProcessingRef.current) return;
             try {
+              isProcessingRef.current = true;
               setProcessingScheduleId(schedule.id);
               await skipRecurringOccurrence(schedule.id);
             } catch (err: any) {
               Alert.alert("Error", err?.message || "Failed to skip recurring occurrence.");
             } finally {
+              isProcessingRef.current = false;
               setProcessingScheduleId(null);
             }
           },

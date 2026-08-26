@@ -59,12 +59,15 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
     return categories.filter((c) => c.type === type);
   }, [categories, type]);
 
+  const prevTypeRef = useRef<"income" | "expense">(type);
+
   // Sync state when modal opens or scheduleToEdit changes
   useEffect(() => {
     if (!visible) return;
 
     if (scheduleToEdit) {
       setType(scheduleToEdit.type);
+      prevTypeRef.current = scheduleToEdit.type;
       setTitle(scheduleToEdit.title);
       const decDigits = activeCurrency.decimal_digits;
       setAmount(
@@ -86,6 +89,7 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
       );
     } else {
       setType("expense");
+      prevTypeRef.current = "expense";
       setTitle("");
       setAmount("");
       setFrequency("monthly");
@@ -96,17 +100,18 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
     }
   }, [visible, scheduleToEdit, categories, activeCurrency.decimal_digits]);
 
-  // When type or matching categories change, ensure selectedCategoryId belongs to matchingCategories
+  // When type changes, ensure selectedCategoryId belongs to matchingCategories
   useEffect(() => {
     if (!visible) return;
-    if (matchingCategories.length > 0) {
-      if (!selectedCategoryId || !matchingCategories.some((c) => c.id === selectedCategoryId)) {
+    if (prevTypeRef.current !== type) {
+      prevTypeRef.current = type;
+      if (matchingCategories.length > 0) {
         setSelectedCategoryId(matchingCategories[0].id);
+      } else {
+        setSelectedCategoryId(null);
       }
-    } else {
-      setSelectedCategoryId(null);
     }
-  }, [visible, matchingCategories, selectedCategoryId]);
+  }, [visible, type, matchingCategories]);
 
   const handleSave = async () => {
     if (isSubmittingRef.current) return;

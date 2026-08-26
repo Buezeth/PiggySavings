@@ -139,7 +139,7 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-blackOverlay60 justify-end">
+      <View className="flex-1 bg-black-overlay-60 justify-end">
         <Pressable className="flex-1" onPress={onClose} />
 
         <KeyboardAvoidingView

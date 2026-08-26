@@ -130,7 +130,12 @@ export async function insertTransaction(
           );
         }
         const newBal = Math.max(0, sourceGoal.current_amount_cents - roundedAmountCents);
-        const newStatus: GoalStatus = newBal >= sourceGoal.target_amount_cents ? "completed" : "active";
+        const newStatus: GoalStatus =
+          sourceGoal.status === "archived"
+            ? "archived"
+            : newBal >= sourceGoal.target_amount_cents
+            ? "completed"
+            : "active";
         await txn.runAsync(
           `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
           [newBal, newStatus, now, tx.source_goal_id]
@@ -335,7 +340,12 @@ export async function deleteTransaction(id: string): Promise<boolean> {
       );
       if (goal) {
         const newBal = Math.max(0, goal.current_amount_cents - contrib.amount_cents);
-        const newStatus: GoalStatus = newBal >= goal.target_amount_cents ? "completed" : "active";
+        const newStatus: GoalStatus =
+          goal.status === "archived"
+            ? "archived"
+            : newBal >= goal.target_amount_cents
+            ? "completed"
+            : "active";
         await txn.runAsync(
           `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
           [newBal, newStatus, now, contrib.goal_id]
@@ -358,7 +368,12 @@ export async function deleteTransaction(id: string): Promise<boolean> {
       );
       if (goal) {
         const newBal = goal.current_amount_cents + tx.amount_cents;
-        const newStatus: GoalStatus = newBal >= goal.target_amount_cents ? "completed" : "active";
+        const newStatus: GoalStatus =
+          goal.status === "archived"
+            ? "archived"
+            : newBal >= goal.target_amount_cents
+            ? "completed"
+            : "active";
         await txn.runAsync(
           `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
           [newBal, newStatus, now, tx.source_goal_id]
@@ -415,7 +430,12 @@ export async function updateTransaction(
         );
         if (oldGoal) {
           const restoredBal = oldGoal.current_amount_cents + existing.amount_cents;
-          const restoredStatus: GoalStatus = restoredBal >= oldGoal.target_amount_cents ? "completed" : "active";
+          const restoredStatus: GoalStatus =
+            oldGoal.status === "archived"
+              ? "archived"
+              : restoredBal >= oldGoal.target_amount_cents
+              ? "completed"
+              : "active";
           await txn.runAsync(
             `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
             [restoredBal, restoredStatus, now, existing.source_goal_id]
@@ -431,7 +451,12 @@ export async function updateTransaction(
         );
         if (newGoal) {
           const deductedBal = Math.max(0, newGoal.current_amount_cents - newAmountCents);
-          const deductedStatus: GoalStatus = deductedBal >= newGoal.target_amount_cents ? "completed" : "active";
+          const deductedStatus: GoalStatus =
+            newGoal.status === "archived"
+              ? "archived"
+              : deductedBal >= newGoal.target_amount_cents
+              ? "completed"
+              : "active";
           await txn.runAsync(
             `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
             [deductedBal, deductedStatus, now, newSourceGoalId]
@@ -456,7 +481,12 @@ export async function updateTransaction(
         if (goal) {
           const updatedContrib = Math.max(0, contrib.amount_cents + diff);
           const newBal = Math.max(0, goal.current_amount_cents + diff);
-          const newStatus: GoalStatus = newBal >= goal.target_amount_cents ? "completed" : "active";
+          const newStatus: GoalStatus =
+            goal.status === "archived"
+              ? "archived"
+              : newBal >= goal.target_amount_cents
+              ? "completed"
+              : "active";
           await txn.runAsync(
             `UPDATE goals SET current_amount_cents = ?, status = ?, updated_at = ? WHERE id = ?;`,
             [newBal, newStatus, now, contrib.goal_id]
@@ -567,14 +597,22 @@ export async function getTransactions(
       c.icon_family AS category_icon_family,
       c.color_code AS category_color_code,
       g_src.title AS source_goal_title,
-      gc.goal_id AS allocated_goal_id,
-      g_alloc.title AS allocated_goal_title,
-      gc.amount_cents AS allocated_goal_amount_cents
+      gc_agg.allocated_goal_id,
+      gc_agg.allocated_goal_title,
+      gc_agg.allocated_goal_amount_cents
     FROM transactions t
     LEFT JOIN categories c ON t.category_id = c.id
     LEFT JOIN goals g_src ON t.source_goal_id = g_src.id
-    LEFT JOIN goal_contributions gc ON gc.transaction_id = t.id
-    LEFT JOIN goals g_alloc ON gc.goal_id = g_alloc.id
+    LEFT JOIN (
+      SELECT 
+        gc.transaction_id,
+        MIN(gc.goal_id) AS allocated_goal_id,
+        MIN(g.title) AS allocated_goal_title,
+        SUM(gc.amount_cents) AS allocated_goal_amount_cents
+      FROM goal_contributions gc
+      LEFT JOIN goals g ON gc.goal_id = g.id
+      GROUP BY gc.transaction_id
+    ) gc_agg ON gc_agg.transaction_id = t.id
     ${whereSql}
     ORDER BY t.transaction_date DESC, t.created_at DESC
   `;

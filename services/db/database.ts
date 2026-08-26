@@ -214,8 +214,10 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
             await txn.execAsync(`
               ALTER TABLE allocation_rules ADD COLUMN schedule_id TEXT REFERENCES recurring_schedules (id) ON DELETE CASCADE;
             `);
-          } catch {
-            // Column might already exist
+          } catch (err: any) {
+            if (!/duplicate column|already exists/i.test(err?.message || "")) {
+              throw err;
+            }
           }
           await txn.execAsync(`
             CREATE INDEX IF NOT EXISTS idx_allocation_schedule ON allocation_rules (schedule_id);
@@ -257,24 +259,30 @@ async function migrateDatabase(db: SQLite.SQLiteDatabase): Promise<void> {
             await txn.execAsync(`
               ALTER TABLE categories ADD COLUMN monthly_budget_cents INTEGER DEFAULT NULL;
             `);
-          } catch {
-            // Column might already exist
+          } catch (err: any) {
+            if (!/duplicate column|already exists/i.test(err?.message || "")) {
+              throw err;
+            }
           }
 
           try {
             await txn.execAsync(`
               ALTER TABLE transactions ADD COLUMN source_goal_id TEXT REFERENCES goals(id) ON DELETE SET NULL;
             `);
-          } catch {
-            // Column might already exist
+          } catch (err: any) {
+            if (!/duplicate column|already exists/i.test(err?.message || "")) {
+              throw err;
+            }
           }
 
           try {
             await txn.execAsync(`
               ALTER TABLE transactions ADD COLUMN is_refund INTEGER NOT NULL DEFAULT 0;
             `);
-          } catch {
-            // Column might already exist
+          } catch (err: any) {
+            if (!/duplicate column|already exists/i.test(err?.message || "")) {
+              throw err;
+            }
           }
 
           await txn.execAsync(`

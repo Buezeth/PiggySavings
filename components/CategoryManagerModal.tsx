@@ -168,7 +168,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     const budgetCents = hasBudget ? (category.monthly_budget_cents as number) : 0;
     const spentCents = budgetSummary?.spentCents ?? 0;
     const percentageUsed = hasBudget ? Math.round((spentCents / budgetCents) * 100) : 0;
-    const isOver = hasBudget && spentCents >= budgetCents;
+    const isOver = hasBudget && spentCents > budgetCents;
 
     let pacingBarClass = "bg-emerald";
     if (percentageUsed >= 100) {

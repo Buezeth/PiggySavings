@@ -169,7 +169,11 @@ export async function applyGoalDelta(
 
     const newAmountCents = Math.max(0, goal.current_amount_cents + roundedDeltaCents);
     const newStatus: GoalStatus =
-      newAmountCents >= goal.target_amount_cents ? "completed" : "active";
+      goal.status === "archived"
+        ? "archived"
+        : newAmountCents >= goal.target_amount_cents
+        ? "completed"
+        : "active";
 
     // 2. Atomic SQL update to goal balance & status
     await txn.runAsync(

@@ -235,8 +235,8 @@ export default function InsightsScreen() {
     const monthlyIncome = cashflowSummary.totalIncomeCents;
     const activeCurrency = getCurrency(currencyCode);
 
-    // Minimum baseline of 500 main currency units (50,000 cents or 500 for zero-decimal)
-    const minBaseline = activeCurrency.decimal_digits === 0 ? 500 : 50000;
+    // Minimum baseline of 500 main currency units (50,000 cents)
+    const minBaseline = 50000;
     return Math.max(monthlyIncome, monthlyGoalTarget, minBaseline);
   }, [goals, cashflowSummary, currencyCode]);
 

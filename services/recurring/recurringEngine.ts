@@ -251,11 +251,11 @@ export async function confirmRecurringSchedule(
     const now = new Date().toISOString();
     const finalAmountCents = customAmountCents !== undefined ? Math.round(customAmountCents) : schedule.amount_cents;
     const finalDate = customDate ?? schedule.next_occurrence;
-    const idempotencyKey = `recurring_${schedule.id}_${schedule.next_occurrence}_${Date.now()}`;
+    const idempotencyKey = `recurring_${schedule.id}_${schedule.next_occurrence}`;
 
     // 1. Insert transaction
-    await txn.runAsync(
-      `INSERT INTO transactions (
+    const insertResult = await txn.runAsync(
+      `INSERT OR IGNORE INTO transactions (
         id,
         category_id,
         type,
@@ -277,9 +277,13 @@ export async function confirmRecurringSchedule(
       ]
     );
 
-    // 2. If income and amount > 0, run auto-allocation engine
+    // 2. If income and amount > 0, run auto-allocation engine only when row was actually inserted
     let allocationSummary: AutoAllocationSummary | undefined;
-    if (schedule.type === "income" && finalAmountCents > 0) {
+    if (
+      schedule.type === "income" &&
+      finalAmountCents > 0 &&
+      (insertResult.changes ?? 0) > 0
+    ) {
       allocationSummary = await evaluateAutoAllocations(
         finalAmountCents,
         schedule.category_id,
