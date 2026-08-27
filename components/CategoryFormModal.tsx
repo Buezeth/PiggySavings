@@ -197,14 +197,15 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         onRequestClose={onClose}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
           className="flex-1 bg-black-overlay-60 justify-end"
         >
-          <Pressable className="flex-1" onPress={onClose} />
+          <Pressable className="absolute inset-0" onPress={onClose} />
 
           <View
             style={{
               height: sheetHeight,
+              maxHeight: "92%",
               paddingBottom: Math.max(insets.bottom, 16),
             }}
             className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
@@ -236,9 +237,10 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
 
             {/* Main Category Form */}
             <ScrollView
-              className="flex-1 p-4"
+              className="p-4"
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
               contentContainerStyle={{ gap: 14 }}
             >
               {/* DEFAULT CATEGORY NOTICE */}
@@ -314,8 +316,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                           }
                         }}
                         className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "income"
-                            ? "bg-emerald border-emerald-light border-b-emerald-dark"
-                            : "bg-transparent border-transparent border-b-transparent"
+                          ? "bg-emerald border-emerald-light border-b-emerald-dark"
+                          : "bg-transparent border-transparent border-b-transparent"
                           }`}
                       >
                         <Ionicons
@@ -341,8 +343,8 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                           }
                         }}
                         className={`will-change-variable flex-1 py-2.5 rounded-xl items-center flex-row justify-center border-2 border-b-4 ${type === "expense"
-                            ? "bg-rose border-rose-light border-b-rose-dark"
-                            : "bg-transparent border-transparent border-b-transparent"
+                          ? "bg-rose border-rose-light border-b-rose-dark"
+                          : "bg-transparent border-transparent border-b-transparent"
                           }`}
                       >
                         <Ionicons

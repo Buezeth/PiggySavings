@@ -174,6 +174,8 @@ export default function ActivityScreen() {
 
       {/* Transaction List */}
       <ScrollView
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingBottom: Math.max(insets.bottom, 20),
