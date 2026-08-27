@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../constants/theme";
 import { SUPPORTED_CURRENCIES, CurrencyOption } from "../constants/currencies";
+import { CartoonCard } from "./CartoonCard";
 
 export interface CurrencyPickerModalProps {
   visible: boolean;
@@ -164,13 +165,14 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
         className="flex-1 bg-black-overlay-60 justify-end"
       >
         <Pressable className="absolute inset-0" onPress={handleClose} />
-        <View
+        <CartoonCard
+          variant="card"
           style={{
             height: "85%",
             maxHeight: "92%",
             paddingBottom: Math.max(insets.bottom, 16),
           }}
-          className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
+          className="rounded-b-none rounded-t-[36px] overflow-hidden flex-col p-0"
         >
           {/* Header */}
           <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
@@ -237,7 +239,7 @@ export const CurrencyPickerModal: React.FC<CurrencyPickerModalProps> = ({
               </View>
             }
           />
-        </View>
+        </CartoonCard>
       </KeyboardAvoidingView>
     </Modal>
   );

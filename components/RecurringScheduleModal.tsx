@@ -19,6 +19,7 @@ import { colors } from "../constants/theme";
 import { useApp } from "../context/AppContext";
 import { RecurringFrequency, RecurringScheduleRow } from "../services/db/types";
 import { calculateNextOccurrence, getLocalTodayStr, parseClampedCustomDays } from "../services/recurring/recurringEngine";
+import { CartoonCard } from "./CartoonCard";
 
 export interface RecurringScheduleModalProps {
   visible: boolean;
@@ -209,9 +210,10 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
         className="flex-1 justify-end bg-black-overlay-60"
       >
         <Pressable className="absolute inset-0" onPress={onClose} />
-        <View
+        <CartoonCard
+          variant="card"
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          className="bg-bg-card rounded-t-3xl border-t-2 border-border-card px-5 pt-5 max-h-[92%]"
+          className="rounded-b-none rounded-t-3xl px-5 pt-5 max-h-[92%]"
         >
           {/* Header */}
           <View className="flex-row items-center justify-between mb-4">
@@ -433,7 +435,7 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
               </Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
+        </CartoonCard>
       </KeyboardAvoidingView>
     </Modal>
   );

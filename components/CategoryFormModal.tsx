@@ -202,13 +202,14 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
         >
           <Pressable className="absolute inset-0" onPress={onClose} />
 
-          <View
+          <CartoonCard
+            variant="card"
             style={{
               height: sheetHeight,
               maxHeight: "92%",
               paddingBottom: Math.max(insets.bottom, 16),
             }}
-            className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
+            className="rounded-b-none rounded-t-[36px] overflow-hidden flex-col p-0"
           >
             {/* Header */}
             <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
@@ -530,7 +531,7 @@ export const CategoryFormModal: React.FC<CategoryFormModalProps> = ({
                 </CartoonCard>
               </View>
             </ScrollView>
-          </View>
+          </CartoonCard>
         </KeyboardAvoidingView>
       </Modal>
 

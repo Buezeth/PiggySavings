@@ -4,12 +4,11 @@ import {
   Alert,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PALETTE_CONFIG, PaletteToken } from "../constants/iconRegistry";
@@ -143,7 +142,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
         <Pressable className="flex-1" onPress={onClose} />
 
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
+          className="flex-1 justify-end"
         >
           <View
             style={{ paddingBottom: Math.max(insets.bottom, 20) }}
@@ -334,11 +334,10 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                           key={cat.id}
                           activeOpacity={0.8}
                           onPress={() => setSelectedCategoryId(cat.id)}
-                          className={`will-change-variable flex-row items-center px-3.5 py-2 rounded-2xl border-2 ${
-                            isSelected
+                          className={`will-change-variable flex-row items-center px-3.5 py-2 rounded-2xl border-2 ${isSelected
                               ? `${palette.bgSubtleClass} ${palette.borderClass}`
                               : "bg-bg-app border-border-card border-b-4 border-b-border-card-dark"
-                          }`}
+                            }`}
                         >
                           {cat.icon_name && (
                             <View className="mr-1.5">
@@ -358,9 +357,8 @@ export const TransactionDetailModal: React.FC<TransactionDetailModalProps> = ({
                             </View>
                           )}
                           <Text
-                            className={`will-change-variable text-xs font-black ${
-                              isSelected ? palette.textClass : "text-text-main"
-                            }`}
+                            className={`will-change-variable text-xs font-black ${isSelected ? palette.textClass : "text-text-main"
+                              }`}
                           >
                             {cat.name}
                           </Text>

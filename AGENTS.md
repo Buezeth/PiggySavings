@@ -208,7 +208,7 @@ PiggySavings embraces a vibrant, tactile, gamified aesthetic designed to make sa
    - **FORBIDDEN**: AI agents must **NEVER** use `<SafeAreaView>` wrapper components (from `react-native` or `react-native-safe-area-context`) or hardcoded fixed paddings (e.g. `paddingBottom: 40`, `pt-4`) for root screen layouts.
    - **Full-Bleed Hero Sections**: Do not wrap full-bleed hero headers in an outer inset-padded container. Set the hero container to full width (`w-full bg-primary`) and apply `paddingTop: Math.max(insets.top, 16)` directly to the hero view.
 3. **Keyboard Visibility & Form Usability**:
-   - Wrap modal/screen form inputs in `<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>` so inputs and submit buttons remain visible when the virtual keyboard is displayed.
+   - Wrap modal/screen form inputs in `<KeyboardAvoidingView behavior="padding">` (or appropriate offset) so inputs and submit buttons remain visible when the virtual keyboard is displayed with edge-to-edge enabled.
 4. **NativeWind v4 Dynamic ClassNames (`will-change-variable`)**:
    - Whenever dynamic JSX classNames conditionally toggle background, text, or shadow theme variables (e.g. `${isActive ? "bg-bg-card shadow-sm" : "bg-transparent"}` or `${type === "income" ? "bg-primary" : "bg-transparent"}`), **MUST prefix the className string with `will-change-variable`**.
 5. **Transparency & Honesty in Action Feedback**:
