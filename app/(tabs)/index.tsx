@@ -19,13 +19,13 @@ import {
   Alert,
   KeyboardAvoidingView,
   Modal,
-  Platform,
+  Pressable,
   ScrollView,
   Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -648,15 +648,16 @@ export default function GoalsHomeScreen() {
         onRequestClose={() => setIsAddGoalModalVisible(false)}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
           className="flex-1 bg-black-overlay-60 justify-end"
         >
+          <Pressable className="absolute inset-0" onPress={() => setIsAddGoalModalVisible(false)} />
           <View
             style={{
-              maxHeight: "90%",
+              maxHeight: "92%",
               paddingBottom: Math.max(insets.bottom, 16),
             }}
-            className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden"
+            className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
           >
             {/* Modal Header */}
             <View className="p-4 border-b border-border-card flex-row items-center justify-between bg-bg-card">
@@ -682,302 +683,303 @@ export default function GoalsHomeScreen() {
               className="p-4"
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
+              automaticallyAdjustKeyboardInsets={true}
             >
               <View className="gap-4">
-              {/* Goal Name & Icon Picker Row */}
-              <View className="mb-2">
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Goal Name & Icon
-                </Text>
-                <View className="flex-row items-center gap-3">
-                  {/* Interactive Icon Trigger Button */}
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => setIsIconPickerVisible(true)}
-                    className={`will-change-variable w-14 h-14 rounded-2xl items-center justify-center border-2 border-b-4 ${newGoalCardVariant === "gold"
-                      ? "bg-gold border-gold-light border-b-gold-dark"
-                      : newGoalCardVariant === "income"
-                        ? "bg-emerald border-emerald-light border-b-emerald-dark"
-                        : newGoalCardVariant === "subtle"
-                          ? "bg-bg-accent border-primary-light border-b-primary-dark"
-                          : "bg-primary border-primary-light border-b-primary-dark"
-                      }`}
-                  >
-                    {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
-                      <MaterialCommunityIcons
-                        name={selectedGoalIcon.name as any}
-                        size={26}
-                        color={colors.white}
-                      />
-                    ) : (
-                      <Ionicons
-                        name={selectedGoalIcon.name as any}
-                        size={26}
-                        color={colors.white}
-                      />
-                    )}
-                  </TouchableOpacity>
+                {/* Goal Name & Icon Picker Row */}
+                <View className="mb-2">
+                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                    Goal Name & Icon
+                  </Text>
+                  <View className="flex-row items-center gap-3">
+                    {/* Interactive Icon Trigger Button */}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setIsIconPickerVisible(true)}
+                      className={`will-change-variable w-14 h-14 rounded-2xl items-center justify-center border-2 border-b-4 ${newGoalCardVariant === "gold"
+                        ? "bg-gold border-gold-light border-b-gold-dark"
+                        : newGoalCardVariant === "income"
+                          ? "bg-emerald border-emerald-light border-b-emerald-dark"
+                          : newGoalCardVariant === "subtle"
+                            ? "bg-bg-accent border-primary-light border-b-primary-dark"
+                            : "bg-primary border-primary-light border-b-primary-dark"
+                        }`}
+                    >
+                      {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
+                        <MaterialCommunityIcons
+                          name={selectedGoalIcon.name as any}
+                          size={26}
+                          color={colors.white}
+                        />
+                      ) : (
+                        <Ionicons
+                          name={selectedGoalIcon.name as any}
+                          size={26}
+                          color={colors.white}
+                        />
+                      )}
+                    </TouchableOpacity>
 
-                  {/* Goal Title Input */}
-                  <View className="flex-1 bg-bg-card rounded-2xl px-3.5 py-3 border-2 border-border-card border-b-4 border-b-border-card-dark justify-center">
-                    <TextInput
-                      value={newGoalTitle}
-                      onChangeText={setNewGoalTitle}
-                      placeholder="e.g., Japan Vacation, Emergency Fund"
-                      placeholderTextColor={colors.textMuted}
-                      className="text-sm text-text-main font-black py-0"
-                      maxLength={40}
-                    />
+                    {/* Goal Title Input */}
+                    <View className="flex-1 bg-bg-card rounded-2xl px-3.5 py-3 border-2 border-border-card border-b-4 border-b-border-card-dark justify-center">
+                      <TextInput
+                        value={newGoalTitle}
+                        onChangeText={setNewGoalTitle}
+                        placeholder="e.g., Japan Vacation, Emergency Fund"
+                        placeholderTextColor={colors.textMuted}
+                        className="text-sm text-text-main font-black py-0"
+                        maxLength={40}
+                      />
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              {/* Target Amount */}
-              <View className="mb-2">
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Target Amount ({currencySymbol.trim()})
-                </Text>
-                <View className="bg-bg-card rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark">
-                  <TextInput
-                    value={newGoalTarget}
-                    onChangeText={setNewGoalTarget}
-                    placeholder={activeCurrency.decimal_digits === 0 ? "1000" : "1000.00"}
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="decimal-pad"
-                    className="text-lg text-text-main font-black py-0"
-                  />
-                </View>
-                {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
-                  <Text className="text-text-muted text-[11px] font-bold mt-1">
-                    {activeCurrency.rounding > 0
-                      ? `Target rounds to nearest ${activeCurrency.rounding} step`
-                      : "Zero-decimal currency"}
+                {/* Target Amount */}
+                <View className="mb-2">
+                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                    Target Amount ({currencySymbol.trim()})
                   </Text>
-                )}
-              </View>
+                  <View className="bg-bg-card rounded-2xl p-3 border-2 border-border-card border-b-4 border-b-border-card-dark">
+                    <TextInput
+                      value={newGoalTarget}
+                      onChangeText={setNewGoalTarget}
+                      placeholder={activeCurrency.decimal_digits === 0 ? "1000" : "1000.00"}
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="decimal-pad"
+                      className="text-lg text-text-main font-black py-0"
+                    />
+                  </View>
+                  {(activeCurrency.rounding > 0 || activeCurrency.decimal_digits === 0) && (
+                    <Text className="text-text-muted text-[11px] font-bold mt-1">
+                      {activeCurrency.rounding > 0
+                        ? `Target rounds to nearest ${activeCurrency.rounding} step`
+                        : "Zero-decimal currency"}
+                    </Text>
+                  )}
+                </View>
 
-              {/* Card Variant Selector (4 tactile swatches) */}
-              <View className="mb-2">
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Card Style Variant
-                </Text>
-                <View className="flex-row justify-between gap-2">
-                  {CARD_VARIANTS.map((v) => {
-                    const isSelected = newGoalCardVariant === v.id;
-                    return (
+                {/* Card Variant Selector (4 tactile swatches) */}
+                <View className="mb-2">
+                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                    Card Style Variant
+                  </Text>
+                  <View className="flex-row justify-between gap-2">
+                    {CARD_VARIANTS.map((v) => {
+                      const isSelected = newGoalCardVariant === v.id;
+                      return (
+                        <TouchableOpacity
+                          key={v.id}
+                          activeOpacity={0.8}
+                          onPress={() => setNewGoalCardVariant(v.id)}
+                          className={`will-change-variable flex-1 p-2.5 rounded-2xl items-center border-2 border-b-4 ${v.bgClass} ${v.borderClass} ${isSelected ? "opacity-100" : "opacity-70"
+                            }`}
+                        >
+                          <Text
+                            className={`will-change-variable text-[11px] font-black mb-1 ${v.textClass}`}
+                          >
+                            {v.label}
+                          </Text>
+                          <View
+                            className={`will-change-variable w-5 h-5 rounded-full items-center justify-center ${isSelected ? "bg-primary" : "bg-bg-app"
+                              }`}
+                          >
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={12} color={colors.white} />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Category Tag Input with Suggestion Chips */}
+                <View className="mb-4">
+                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
+                    Category Tag
+                  </Text>
+                  <View className="bg-bg-card rounded-2xl px-3.5 py-2.5 border-2 border-border-card border-b-4 border-b-border-card-dark mb-2.5">
+                    <TextInput
+                      value={newGoalCategory}
+                      onChangeText={setNewGoalCategory}
+                      placeholder="e.g., ✈️ Travel, 🏠 Home"
+                      placeholderTextColor={colors.textMuted}
+                      className="text-sm text-text-main font-bold py-0"
+                      maxLength={24}
+                    />
+                  </View>
+
+                  {/* Preset Suggestions */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ gap: 6 }}
+                  >
+                    {TAG_SUGGESTIONS.map((tag) => (
                       <TouchableOpacity
-                        key={v.id}
-                        activeOpacity={0.8}
-                        onPress={() => setNewGoalCardVariant(v.id)}
-                        className={`will-change-variable flex-1 p-2.5 rounded-2xl items-center border-2 border-b-4 ${v.bgClass} ${v.borderClass} ${isSelected ? "opacity-100" : "opacity-70"
+                        key={tag}
+                        activeOpacity={0.75}
+                        onPress={() => setNewGoalCategory(tag)}
+                        className={`will-change-variable px-3 py-1.5 rounded-full border-2 border-b-4 ${newGoalCategory === tag
+                          ? "bg-coral-subtle border-primary-light border-b-primary-dark"
+                          : "bg-bg-card border-border-card border-b-border-card-dark"
                           }`}
                       >
                         <Text
-                          className={`will-change-variable text-[11px] font-black mb-1 ${v.textClass}`}
-                        >
-                          {v.label}
-                        </Text>
-                        <View
-                          className={`will-change-variable w-5 h-5 rounded-full items-center justify-center ${isSelected ? "bg-primary" : "bg-bg-app"
+                          className={`will-change-variable text-xs font-black ${newGoalCategory === tag ? "text-primary" : "text-text-muted"
                             }`}
                         >
-                          {isSelected && (
-                            <Ionicons name="checkmark" size={12} color={colors.white} />
-                          )}
-                        </View>
+                          {tag}
+                        </Text>
                       </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Category Tag Input with Suggestion Chips */}
-              <View className="mb-4">
-                <Text className="text-text-muted text-xs font-black uppercase tracking-wider mb-2">
-                  Category Tag
-                </Text>
-                <View className="bg-bg-card rounded-2xl px-3.5 py-2.5 border-2 border-border-card border-b-4 border-b-border-card-dark mb-2.5">
-                  <TextInput
-                    value={newGoalCategory}
-                    onChangeText={setNewGoalCategory}
-                    placeholder="e.g., ✈️ Travel, 🏠 Home"
-                    placeholderTextColor={colors.textMuted}
-                    className="text-sm text-text-main font-bold py-0"
-                    maxLength={24}
-                  />
+                    ))}
+                  </ScrollView>
                 </View>
 
-                {/* Preset Suggestions */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 6 }}
-                >
-                  {TAG_SUGGESTIONS.map((tag) => (
-                    <TouchableOpacity
-                      key={tag}
-                      activeOpacity={0.75}
-                      onPress={() => setNewGoalCategory(tag)}
-                      className={`will-change-variable px-3 py-1.5 rounded-full border-2 border-b-4 ${newGoalCategory === tag
-                        ? "bg-coral-subtle border-primary-light border-b-primary-dark"
-                        : "bg-bg-card border-border-card border-b-border-card-dark"
-                        }`}
-                    >
-                      <Text
-                        className={`will-change-variable text-xs font-black ${newGoalCategory === tag ? "text-primary" : "text-text-muted"
-                          }`}
-                      >
-                        {tag}
+                {/* Set as Featured Goal Toggle */}
+                <CartoonCard className="mb-2 p-3.5 flex-row items-center justify-between">
+                  <View className="flex-row items-center flex-1 mr-3">
+                    <View className="w-9 h-9 rounded-xl bg-gold-subtle border border-gold-border items-center justify-center mr-2.5">
+                      <Ionicons name="star" size={18} color={colors.goldDark} />
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-text-main text-xs font-black">
+                        Set as Featured Goal ⭐
                       </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Set as Featured Goal Toggle */}
-              <CartoonCard className="mb-2 p-3.5 flex-row items-center justify-between">
-                <View className="flex-row items-center flex-1 mr-3">
-                  <View className="w-9 h-9 rounded-xl bg-gold-subtle border border-gold-border items-center justify-center mr-2.5">
-                    <Ionicons name="star" size={18} color={colors.goldDark} />
+                      <Text className="text-text-muted text-[11px] font-bold">
+                        Pins this goal to the top of your dashboard
+                      </Text>
+                    </View>
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-text-main text-xs font-black">
-                      Set as Featured Goal ⭐
+                  <Switch
+                    value={isNewGoalFeatured}
+                    onValueChange={setIsNewGoalFeatured}
+                    trackColor={{ false: colors.mutedTrack, true: colors.primary }}
+                    thumbColor={colors.white}
+                  />
+                </CartoonCard>
+
+                {/* Live Goal Card Preview */}
+                <View className="mb-2">
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text className="text-text-muted text-xs font-black uppercase tracking-wider">
+                      Live Card Preview
                     </Text>
-                    <Text className="text-text-muted text-[11px] font-bold">
-                      Pins this goal to the top of your dashboard
+                    <Text className="text-primary text-[11px] font-bold">
+                      What your goal card looks like
                     </Text>
                   </View>
-                </View>
-                <Switch
-                  value={isNewGoalFeatured}
-                  onValueChange={setIsNewGoalFeatured}
-                  trackColor={{ false: colors.mutedTrack, true: colors.primary }}
-                  thumbColor={colors.white}
-                />
-              </CartoonCard>
 
-              {/* Live Goal Card Preview */}
-              <View className="mb-2">
-                <View className="flex-row items-center justify-between mb-2">
-                  <Text className="text-text-muted text-xs font-black uppercase tracking-wider">
-                    Live Card Preview
-                  </Text>
-                  <Text className="text-primary text-[11px] font-bold">
-                    What your goal card looks like
-                  </Text>
-                </View>
+                  {(() => {
+                    const parsed = parseCurrencyToCents(newGoalTarget, currencyCode);
+                    const targetCents = parsed?.cents || 100000;
+                    const isGold = newGoalCardVariant === "gold";
+                    const isIncome = newGoalCardVariant === "income";
+                    const isSubtle = newGoalCardVariant === "subtle";
 
-                {(() => {
-                  const parsed = parseCurrencyToCents(newGoalTarget, currencyCode);
-                  const targetCents = parsed?.cents || 100000;
-                  const isGold = newGoalCardVariant === "gold";
-                  const isIncome = newGoalCardVariant === "income";
-                  const isSubtle = newGoalCardVariant === "subtle";
+                    const iconBgClass = isGold
+                      ? "will-change-variable bg-gold"
+                      : isIncome
+                        ? "will-change-variable bg-emerald"
+                        : isSubtle
+                          ? "will-change-variable bg-bg-accent"
+                          : "will-change-variable bg-primary";
 
-                  const iconBgClass = isGold
-                    ? "will-change-variable bg-gold"
-                    : isIncome
-                    ? "will-change-variable bg-emerald"
-                    : isSubtle
-                    ? "will-change-variable bg-bg-accent"
-                    : "will-change-variable bg-primary";
+                    const amountTextClass = isGold
+                      ? "will-change-variable text-gold-dark"
+                      : isIncome
+                        ? "will-change-variable text-emerald-dark"
+                        : "will-change-variable text-primary";
 
-                  const amountTextClass = isGold
-                    ? "will-change-variable text-gold-dark"
-                    : isIncome
-                    ? "will-change-variable text-emerald-dark"
-                    : "will-change-variable text-primary";
+                    const badgeBorderClass = isGold
+                      ? "will-change-variable border-gold-border"
+                      : isIncome
+                        ? "will-change-variable border-emerald-border"
+                        : "will-change-variable border-border-card";
 
-                  const badgeBorderClass = isGold
-                    ? "will-change-variable border-gold-border"
-                    : isIncome
-                    ? "will-change-variable border-emerald-border"
-                    : "will-change-variable border-border-card";
+                    const progressFillClass = isGold
+                      ? "will-change-variable bg-gold-dark"
+                      : isIncome
+                        ? "will-change-variable bg-emerald"
+                        : "will-change-variable bg-primary";
 
-                  const progressFillClass = isGold
-                    ? "will-change-variable bg-gold-dark"
-                    : isIncome
-                    ? "will-change-variable bg-emerald"
-                    : "will-change-variable bg-primary";
+                    return (
+                      <CartoonCard variant={newGoalCardVariant} className="p-4">
+                        <View className="flex-row items-center justify-between mb-3">
+                          <View
+                            className={`w-10 h-10 rounded-2xl ${iconBgClass} items-center justify-center shadow-sm`}
+                          >
+                            {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
+                              <MaterialCommunityIcons
+                                name={selectedGoalIcon.name as any}
+                                size={20}
+                                color={colors.white}
+                              />
+                            ) : (
+                              <Ionicons
+                                name={selectedGoalIcon.name as any}
+                                size={20}
+                                color={colors.white}
+                              />
+                            )}
+                          </View>
 
-                  return (
-                    <CartoonCard variant={newGoalCardVariant} className="p-4">
-                      <View className="flex-row items-center justify-between mb-3">
-                        <View
-                          className={`w-10 h-10 rounded-2xl ${iconBgClass} items-center justify-center shadow-sm`}
-                        >
-                          {selectedGoalIcon.family === "MaterialCommunityIcons" ? (
-                            <MaterialCommunityIcons
-                              name={selectedGoalIcon.name as any}
-                              size={20}
-                              color={colors.white}
-                            />
-                          ) : (
-                            <Ionicons
-                              name={selectedGoalIcon.name as any}
-                              size={20}
-                              color={colors.white}
-                            />
-                          )}
-                        </View>
-
-                        <View className="flex-row items-center gap-1.5">
-                          {isNewGoalFeatured && (
-                            <View className="bg-gold px-2 py-0.5 rounded-lg border border-gold-dark">
-                              <Text className="text-white text-[10px] font-black">
-                                ⭐ Featured
+                          <View className="flex-row items-center gap-1.5">
+                            {isNewGoalFeatured && (
+                              <View className="bg-gold px-2 py-0.5 rounded-lg border border-gold-dark">
+                                <Text className="text-white text-[10px] font-black">
+                                  ⭐ Featured
+                                </Text>
+                              </View>
+                            )}
+                            <View
+                              className={`bg-white-overlay-80 px-2 py-0.5 rounded-lg border ${badgeBorderClass}`}
+                            >
+                              <Text className={`${amountTextClass} text-[10px] font-black`}>
+                                0%
                               </Text>
                             </View>
-                          )}
-                          <View
-                            className={`bg-white-overlay-80 px-2 py-0.5 rounded-lg border ${badgeBorderClass}`}
-                          >
-                            <Text className={`${amountTextClass} text-[10px] font-black`}>
-                              0%
-                            </Text>
                           </View>
                         </View>
-                      </View>
 
-                      <Text
-                        className="text-text-main text-sm font-black mb-0.5"
-                        numberOfLines={1}
-                      >
-                        {newGoalTitle.trim() || "Your Goal Title"}
-                      </Text>
-                      <Text className={`${amountTextClass} text-base font-black`}>
-                        {formatMoney(0)}
-                      </Text>
-                      <Text className="text-text-muted text-[11px] font-bold mb-3">
-                        of {formatMoney(targetCents)} goal
-                      </Text>
+                        <Text
+                          className="text-text-main text-sm font-black mb-0.5"
+                          numberOfLines={1}
+                        >
+                          {newGoalTitle.trim() || "Your Goal Title"}
+                        </Text>
+                        <Text className={`${amountTextClass} text-base font-black`}>
+                          {formatMoney(0)}
+                        </Text>
+                        <Text className="text-text-muted text-[11px] font-bold mb-3">
+                          of {formatMoney(targetCents)} goal
+                        </Text>
 
-                      {/* Playful Progress Bar Preview */}
-                      <View className="h-2.5 bg-white-overlay-70 rounded-full overflow-hidden border border-white-overlay-20">
-                        <View
-                          style={{ width: "6%" }}
-                          className={`h-full ${progressFillClass} rounded-full`}
-                        />
-                      </View>
-                    </CartoonCard>
-                  );
-                })()}
-              </View>
+                        {/* Playful Progress Bar Preview */}
+                        <View className="h-2.5 bg-white-overlay-70 rounded-full overflow-hidden border border-white-overlay-20">
+                          <View
+                            style={{ width: "6%" }}
+                            className={`h-full ${progressFillClass} rounded-full`}
+                          />
+                        </View>
+                      </CartoonCard>
+                    );
+                  })()}
+                </View>
 
-              {/* Submit Button */}
-              <View className="pt-2 pb-6">
-                <TouchableOpacity
-                  onPress={handleSaveGoal}
-                  disabled={isSubmittingGoal}
-                  activeOpacity={0.85}
-                  className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
-                >
-                  <Text className="text-white text-sm font-black uppercase tracking-wider">
-                    {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                {/* Submit Button */}
+                <View className="pt-2 pb-6">
+                  <TouchableOpacity
+                    onPress={handleSaveGoal}
+                    disabled={isSubmittingGoal}
+                    activeOpacity={0.85}
+                    className="bg-primary border-2 border-primary-light border-b-4 border-b-primary-dark rounded-2xl py-3.5 items-center justify-center"
+                  >
+                    <Text className="text-white text-sm font-black uppercase tracking-wider">
+                      {isSubmittingGoal ? "Creating..." : "Save Goal 🚀"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </ScrollView>
           </View>

@@ -132,14 +132,15 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1 bg-black-overlay-60 justify-end"
       >
-        <Pressable className="flex-1" onPress={onClose} />
+        <Pressable className="absolute inset-0" onPress={onClose} />
 
         <View
           style={{
             height: sheetHeight,
+            maxHeight: "92%",
             paddingBottom: Math.max(insets.bottom, 16),
           }}
           className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
@@ -172,9 +173,10 @@ export const RecurringReviewModal: React.FC<RecurringReviewModalProps> = ({
 
           {/* Body */}
           <ScrollView
-            className="flex-1 p-4"
+            className="p-4"
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={true}
             contentContainerStyle={{ gap: 14 }}
           >
             {pendingCount === 0 ? (

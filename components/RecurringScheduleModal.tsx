@@ -205,13 +205,13 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior="padding"
         className="flex-1 justify-end bg-black-overlay-60"
       >
-        <Pressable className="flex-1" onPress={onClose} />
+        <Pressable className="absolute inset-0" onPress={onClose} />
         <View
           style={{ paddingBottom: Math.max(insets.bottom, 24) }}
-          className="bg-bg-card rounded-t-3xl border-t-2 border-border-card px-5 pt-5 max-h-[85%]"
+          className="bg-bg-card rounded-t-3xl border-t-2 border-border-card px-5 pt-5 max-h-[92%]"
         >
           {/* Header */}
           <View className="flex-row items-center justify-between mb-4">
@@ -231,7 +231,11 @@ export const RecurringScheduleModal: React.FC<RecurringScheduleModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={true}
+          >
             {/* Income / Expense Switch */}
             <View className="flex-row bg-bg-app p-1.5 rounded-3xl border-2 border-border-card border-b-4 border-b-border-card-dark mb-4">
               <TouchableOpacity

@@ -2,6 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   FlatList,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -146,12 +147,16 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View className="flex-1 bg-black-overlay-60 justify-end">
-        <Pressable className="flex-1" onPress={onClose} />
+      <KeyboardAvoidingView
+        behavior="padding"
+        className="flex-1 bg-black-overlay-60 justify-end"
+      >
+        <Pressable className="absolute inset-0" onPress={onClose} />
 
         <View
           style={{
             height: sheetHeight,
+            maxHeight: "92%",
             paddingBottom: Math.max(insets.bottom, 16),
           }}
           className="bg-bg-app rounded-t-[36px] border-t-2 border-border-card overflow-hidden flex-col"
@@ -273,7 +278,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             )}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
